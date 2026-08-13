@@ -11,6 +11,7 @@ import type {
   CalendarEvents,
   CalendarRange,
   CalendarStatus,
+  DemoLogin,
   HearingResponse,
   HearingTurn,
   ProposalRequest,
@@ -148,6 +149,20 @@ export function calendarEvents(range: CalendarRange, signal?: AbortSignal): Prom
 /** 連携はブラウザごと Google へ送るので, fetch せず遷移先だけ返す */
 export function calendarLoginUrl(): string {
   return `${API_BASE}/api/calendar/login`;
+}
+
+/** 名前だけでログインする。初めての名前ならサーバーがデモの予定を積む。204 なので本文は読まない */
+export async function demoLogin(name: string, signal?: AbortSignal): Promise<ApiResult<null>> {
+  const body: DemoLogin = { name: name.trim() || null };
+  const init: RequestInit = {
+    ...WITH_SESSION,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
+  const sent = await send("/api/calendar/demo-login", init, signal, TIMEOUT_MS);
+  if (!sent.ok) return sent;
+  return { ok: true, data: null };
 }
 
 /** 資格情報を消して Google 側にも取り消しを伝える。204 なので本文は読まない */

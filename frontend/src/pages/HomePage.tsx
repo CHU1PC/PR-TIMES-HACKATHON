@@ -101,8 +101,8 @@ export function HomePage() {
       return;
     }
 
-    // 未連携・未設定は予定を出さない。空のカレンダーだけ残す
-    if (!current.data.configured || !current.data.connected) {
+    // 未ログインは予定を出さない。空のカレンダーだけ残す
+    if (!current.data.signed_in) {
       setEvents([]);
       return;
     }

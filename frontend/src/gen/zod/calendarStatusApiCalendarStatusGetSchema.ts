@@ -9,6 +9,6 @@ import { z } from "zod/v4";
 /**
  * @description Successful Response
  */
-export const calendarStatusApiCalendarStatusGet200Schema = z.lazy(() => calendarStatusSchema).describe("連携しているかどうか。")
+export const calendarStatusApiCalendarStatusGet200Schema = z.lazy(() => calendarStatusSchema).describe("ログインと連携の状況。")
 
 export const calendarStatusApiCalendarStatusGetQueryResponseSchema = z.lazy(() => calendarStatusApiCalendarStatusGet200Schema)
