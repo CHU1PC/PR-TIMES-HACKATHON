@@ -20,6 +20,14 @@ dist/
 # ETL 出力（RDS由来のデータはコミットしない）
 data/
 
+# Google Calendar の認証情報
+credentials.json
+google_token.json
+
+# Google Calendar の認証情報
+credentials.json
+google_token.json
+
 # misc
 # draw.io が編集中に作る退避ファイル
 .$*.drawio.bkp
@@ -29,6 +37,3 @@ data/
 
 # 計画メモ（ツールのスクラッチ）
 .hermes/
-
-credentials.json
-google_token.json
