@@ -26,6 +26,7 @@ class CalendarEvent(BaseModel):
 class CalendarStatus(BaseModel):
     """連携しているかどうか。"""
 
+    configured: bool = Field(description="この環境で連携機能が使えるか。false なら連携ボタンを出さない")
     connected: bool = Field(description="Google と連携済みか")
 
 

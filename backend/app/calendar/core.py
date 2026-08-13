@@ -1,6 +1,8 @@
 from typing import Final
+from uuid import UUID
 
 from googleapiclient.discovery import Resource, build
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.google import load_credentials
 from app.schema.calendar import CalendarEvent
@@ -10,13 +12,17 @@ MAX_EVENTS: Final = 250
 NO_TITLE: Final = "(タイトルなし)"
 
 
-def service() -> Resource | None:
-    """Calendar API のクライアントを作る。
+async def service(db: AsyncSession, user_id: UUID) -> Resource | None:
+    """そのユーザーの Calendar API クライアントを作る。
+
+    Args:
+        db: データベースセッション。
+        user_id: 対象のユーザー。
 
     Returns:
         API クライアント。未連携なら None。
     """
-    credentials = load_credentials()
+    credentials = await load_credentials(db, user_id)
 
     if credentials is None:
         return None
@@ -24,17 +30,24 @@ def service() -> Resource | None:
     return build("calendar", "v3", credentials=credentials)
 
 
-def events(time_min: str | None = None, time_max: str | None = None) -> list[CalendarEvent] | None:
-    """主カレンダーの予定を引く。
+async def events(
+    db: AsyncSession,
+    user_id: UUID,
+    time_min: str | None = None,
+    time_max: str | None = None,
+) -> list[CalendarEvent] | None:
+    """そのユーザーの主カレンダーの予定を引く。
 
     Args:
+        db: データベースセッション。
+        user_id: 対象のユーザー。
         time_min: 取得開始時刻 (RFC3339)。None なら指定しない。
         time_max: 取得終了時刻 (RFC3339)。None なら指定しない。
 
     Returns:
         予定の一覧。未連携なら None。
     """
-    client = service()
+    client = await service(db, user_id)
 
     if client is None:
         return None
