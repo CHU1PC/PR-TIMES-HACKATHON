@@ -9,7 +9,9 @@ export function formatDate(value: string): string {
   const day = Number(match[3]);
   // 時差でずれないようローカル正午で解釈する
   const date = new Date(year, month - 1, day, 12, 0, 0);
-  if (Number.isNaN(date.getTime())) return value;
+  // Date は 2026-02-30 を 3月2日に繰り上げて有効な日付にしてしまう。
+  // isNaN では検出できないので、入力と一致するかを往復で確かめる
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return value;
   const weekday = WEEKDAYS[date.getDay()] ?? "";
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日（${weekday}）`;
 }
