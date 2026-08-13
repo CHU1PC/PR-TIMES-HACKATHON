@@ -13,6 +13,8 @@ from app.db.models import GoogleCredential
 
 TOKEN_ENDPOINT: Final = "https://oauth2.googleapis.com/token"  # ruff:ignore[hardcoded-password-string]
 
+REVOKE_ENDPOINT: Final = "https://oauth2.googleapis.com/revoke"
+
 # サインインとカレンダー読み取りを1回の同意でまとめて取る
 SCOPES: Final = [
     "openid",
@@ -70,3 +72,27 @@ async def save_credentials(db: AsyncSession, user_id: UUID, credentials: Credent
         row.token_json = credentials.to_json()
 
     await db.commit()
+
+
+async def forget_credentials(db: AsyncSession, user_id: UUID) -> str | None:
+    """保存した資格情報を消す。
+
+    Args:
+        db: データベースセッション。
+        user_id: 対象のユーザー。
+
+    Returns:
+        Google 側にも取り消しを伝えるための refresh token。無ければ None。
+    """
+    row = (
+        await db.execute(select(GoogleCredential).where(col(GoogleCredential.user_id) == user_id))
+    ).scalar_one_or_none()
+
+    if row is None:
+        return None
+
+    token = json.loads(row.token_json).get("refresh_token")
+    await db.delete(row)
+    await db.commit()
+
+    return token
