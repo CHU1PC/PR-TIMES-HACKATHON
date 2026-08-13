@@ -48,6 +48,8 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/calendar/oauth/callback}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # 手元は demo。名前だけのログインが開く。本番の設定には入れない
+      APP_ENV: ${APP_ENV:-demo}
       # glibc malloc arena 数を制限して RSS 単調増加を抑える
       MALLOC_ARENA_MAX: "2"
     ports:
