@@ -151,12 +151,14 @@ aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
 unset CID CSEC
 ```
 
-置けたかは名前だけで確かめる。値は取り出さない。
+置けたかを確かめる。`--with-decryption` を付けないので値は復号されない。
+`describe-parameters` は資源指定に対応せずポリシーで拒否されるので使えない。
 
 ```bash
-aws ssm describe-parameters --profile prtimes --region ap-northeast-1 \
-  --parameter-filters "Key=Name,Option=BeginsWith,Values=/prtimes-hackathon/google" \
-  --query 'Parameters[].[Name,Type]' --output table
+for n in google-client-id google-client-secret; do
+  aws ssm get-parameter --profile prtimes --region ap-northeast-1 \
+    --name "/prtimes-hackathon/$n" --query 'Parameter.[Name,Type,Version]' --output text
+done
 ```
 
 置くと**次のデプロイで自動的に有効になる**。CI がパラメータの有無を見て
