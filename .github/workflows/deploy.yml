@@ -1,5 +1,11 @@
 name: deploy
 
+# バックエンドを ECR へ積み、CloudFormation で AWS の構成を更新し、フロントを S3 へ配る。
+# main への push（docs と md を除く）と手動実行で発火。
+# AWS の認証は OIDC で、長期キーは持たない。ロールを引けるのは deploy ジョブだけ。
+# db スタックはここでは流さない。スキーマとコーパスの更新は手元から行う。
+# 公開先: CloudFront のドメイン（実行サマリに出る）
+
 on:
   push:
     branches: [main]
