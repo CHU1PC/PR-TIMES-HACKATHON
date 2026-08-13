@@ -1,10 +1,25 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: GitHub Actions が長期キー無しで AWS を触るための OIDC 信頼. app スタックより先に一度だけ作る
+Description: IAM 一式. OIDC 信頼・CI のロール・共通の deploy ポリシー・手元だけの bootstrap ポリシー
 
 Parameters:
   NamePrefix:
     Type: String
     Default: prtimes-hackathon
+
+  OrganizerDbIdentifier:
+    Type: String
+    Default: prtimes-hackathon-2026summer-db
+    Description: 主催者の RDS. Deny の対象にする
+
+  OrganizerInstanceId:
+    Type: String
+    Default: i-0c72d1263ec5fef53
+    Description: 主催者の EC2. Deny の対象にする
+
+  AppNamePrefix:
+    Type: String
+    Default: prtimes-hackathon-2026summer
+    Description: app スタックの NamePrefix. 渡せるロールを実名で限定するのに使う
 
   AllowedSubject:
     Type: String
@@ -57,194 +72,310 @@ Resources:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
                 token.actions.githubusercontent.com:sub: !Ref AllowedSubject
-      Policies:
-        - PolicyName: deploy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: CloudFormationOnThisProjectsStacks
-                Effect: Allow
-                Action: cloudformation:*
-                Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NamePrefix}-*/*"
-
-              - Sid: CloudFormationAccountWideReads
-                Effect: Allow
-                Action:
-                  - cloudformation:ListStacks
-                  - cloudformation:ValidateTemplate
-                  - cloudformation:ListExports
-                Resource: "*"
-
-              - Sid: FrontendBucket
-                Effect: Allow
-                Action: s3:*
-                Resource:
-                  - !Sub "arn:aws:s3:::${NamePrefix}-*-frontend-${AWS::AccountId}"
-                  - !Sub "arn:aws:s3:::${NamePrefix}-*-frontend-${AWS::AccountId}/*"
-
-              - Sid: CloudFront
-                Effect: Allow
-                Action:
-                  - cloudfront:CreateDistribution
-                  - cloudfront:GetDistribution
-                  - cloudfront:GetDistributionConfig
-                  - cloudfront:UpdateDistribution
-                  - cloudfront:DeleteDistribution
-                  - cloudfront:TagResource
-                  - cloudfront:UntagResource
-                  - cloudfront:ListTagsForResource
-                  - cloudfront:CreateOriginAccessControl
-                  - cloudfront:GetOriginAccessControl
-                  - cloudfront:GetOriginAccessControlConfig
-                  - cloudfront:UpdateOriginAccessControl
-                  - cloudfront:DeleteOriginAccessControl
-                  - cloudfront:CreateInvalidation
-                  - cloudfront:GetInvalidation
-                  - cloudfront:ListCachePolicies
-                  - cloudfront:GetCachePolicy
-                  - cloudfront:ListOriginRequestPolicies
-                  - cloudfront:GetOriginRequestPolicy
-                Resource: "*"
-
-              - Sid: ReadNetwork
-                Effect: Allow
-                Action: ec2:Describe*
-                Resource: "*"
-
-              - Sid: ManageOwnSecurityGroups
-                Effect: Allow
-                Action:
-                  - ec2:CreateSecurityGroup
-                  - ec2:DeleteSecurityGroup
-                  - ec2:AuthorizeSecurityGroupIngress
-                  - ec2:AuthorizeSecurityGroupEgress
-                  - ec2:RevokeSecurityGroupIngress
-                  - ec2:RevokeSecurityGroupEgress
-                  - ec2:ModifySecurityGroupRules
-                  - ec2:GetManagedPrefixListEntries
-                  - ec2:CreateTags
-                  - ec2:DeleteTags
-                Resource: "*"
-
-              # VPC にはパブリックサブネットが1枚しかなく ALB が作れないので, もう1枚足す。
-              # 既存のサブネットとルートテーブルには触らない
-              - Sid: ManageProjectNetwork
-                Effect: Allow
-                Action:
-                  - ec2:CreateSubnet
-                  - ec2:DeleteSubnet
-                  - ec2:ModifySubnetAttribute
-                  - ec2:CreateRouteTable
-                  - ec2:DeleteRouteTable
-                  - ec2:CreateRoute
-                  - ec2:DeleteRoute
-                  - ec2:AssociateRouteTable
-                  - ec2:DisassociateRouteTable
-                Resource: "*"
-
-              - Sid: ContainerRegistry
-                Effect: Allow
-                Action:
-                  - ecr:GetAuthorizationToken
-                  - ecr:CreateRepository
-                  - ecr:DeleteRepository
-                  - ecr:DescribeRepositories
-                  - ecr:DescribeImages
-                  - ecr:ListTagsForResource
-                  - ecr:TagResource
-                  - ecr:UntagResource
-                  - ecr:PutLifecyclePolicy
-                  - ecr:GetLifecyclePolicy
-                  - ecr:DeleteLifecyclePolicy
-                  - ecr:SetRepositoryPolicy
-                  - ecr:GetRepositoryPolicy
-                  - ecr:DeleteRepositoryPolicy
-                  - ecr:PutImageScanningConfiguration
-                  - ecr:BatchCheckLayerAvailability
-                  - ecr:InitiateLayerUpload
-                  - ecr:UploadLayerPart
-                  - ecr:CompleteLayerUpload
-                  - ecr:PutImage
-                  - ecr:BatchGetImage
-                  - ecr:GetDownloadUrlForLayer
-                  - ecr:BatchDeleteImage
-                Resource: "*"
-
-              - Sid: EcsAndLoadBalancer
-                Effect: Allow
-                Action:
-                  - ecs:*
-                  - elasticloadbalancing:*
-                  - application-autoscaling:*
-                Resource: "*"
-
-              # ターゲット追跡が自分で作るアラーム
-              - Sid: AlarmsCreatedByTargetTracking
-                Effect: Allow
-                Action:
-                  - cloudwatch:PutMetricAlarm
-                  - cloudwatch:DeleteAlarms
-                  - cloudwatch:DescribeAlarms
-                  - cloudwatch:GetMetricData
-                Resource: "*"
-
-              - Sid: Logs
-                Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:DeleteLogGroup
-                  - logs:DescribeLogGroups
-                  - logs:DescribeLogStreams
-                  - logs:PutRetentionPolicy
-                  - logs:ListTagsForResource
-                  - logs:TagResource
-                  - logs:UntagResource
-                  - logs:GetLogEvents
-                  - logs:FilterLogEvents
-                Resource: "*"
-
-              # 作れるロールをこの名前空間に閉じる. "*" にすると CI が任意権限のロールを
-              # 作って引き渡せてしまう
-              - Sid: RolesForThisProjectOnly
-                Effect: Allow
-                Action:
-                  - iam:CreateRole
-                  - iam:DeleteRole
-                  - iam:GetRole
-                  - iam:PassRole
-                  - iam:TagRole
-                  - iam:UntagRole
-                  - iam:AttachRolePolicy
-                  - iam:DetachRolePolicy
-                  - iam:PutRolePolicy
-                  - iam:DeleteRolePolicy
-                  - iam:GetRolePolicy
-                  - iam:ListRolePolicies
-                  - iam:ListAttachedRolePolicies
-                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${NamePrefix}-*"
-
-              - Sid: EcsNeedsItsServiceLinkedRoleOnFirstUse
-                Effect: Allow
-                Action: iam:CreateServiceLinkedRole
-                Resource: "*"
-                Condition:
-                  StringEquals:
-                    iam:AWSServiceName:
-                      - ecs.amazonaws.com
-                      - ecs.application-autoscaling.amazonaws.com
-                      - elasticloadbalancing.amazonaws.com
-
-              # CI はキーの値を使わない. タスク定義に ARN を書くために存在確認するだけ。
-              # ssm:DescribeParameters は資源指定に対応せず必ず拒否されるので入れない
-              - Sid: ReadOpenAiKeyParameter
-                Effect: Allow
-                Action: ssm:GetParameter
-                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/*"
       Tags:
         - Key: Project
           Value: !Ref NamePrefix
 
+  # 定義はここ1箇所だけ。CI のロールと手元の IAM ユーザーが同じものを参照する
+  DeployPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${NamePrefix}-deploy"
+      Roles: [!Ref DeployRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Deny は Allow に優先する。主催者の資源には誰からも触れない
+          - Sid: NeverTouchTheOrganizersData
+            Effect: Deny
+            Action:
+              - rds:DeleteDBInstance
+              - rds:ModifyDBInstance
+              - rds:RebootDBInstance
+              - ec2:TerminateInstances
+              - ec2:StopInstances
+            Resource:
+              - !Sub "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:${OrganizerDbIdentifier}"
+              - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${OrganizerInstanceId}"
+
+          - Sid: NeverTouchTheOrganizersStack
+            Effect: Deny
+            Action: cloudformation:*
+            Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/prtimes-hackathon-2026summer/*"
+
+          - Sid: CloudFormationOnThisProjectsStacks
+            Effect: Allow
+            Action: cloudformation:*
+            Resource:
+              - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NamePrefix}-*/*"
+              # CLOUDFRONT スコープの WebACL は us-east-1 でしか作れない
+              - !Sub "arn:aws:cloudformation:us-east-1:${AWS::AccountId}:stack/${NamePrefix}-*/*"
+
+          - Sid: CloudFormationAccountWideReads
+            Effect: Allow
+            Action:
+              - cloudformation:ListStacks
+              - cloudformation:ValidateTemplate
+              - cloudformation:ListExports
+            Resource: "*"
+
+          - Sid: FrontendBucket
+            Effect: Allow
+            Action: s3:*
+            Resource:
+              - !Sub "arn:aws:s3:::${NamePrefix}-*-frontend-${AWS::AccountId}"
+              - !Sub "arn:aws:s3:::${NamePrefix}-*-frontend-${AWS::AccountId}/*"
+
+          - Sid: CloudFront
+            Effect: Allow
+            Action:
+              - cloudfront:CreateDistribution
+              - cloudfront:GetDistribution
+              - cloudfront:GetDistributionConfig
+              - cloudfront:UpdateDistribution
+              - cloudfront:DeleteDistribution
+              - cloudfront:TagResource
+              - cloudfront:UntagResource
+              - cloudfront:ListTagsForResource
+              - cloudfront:CreateOriginAccessControl
+              - cloudfront:GetOriginAccessControl
+              - cloudfront:GetOriginAccessControlConfig
+              - cloudfront:UpdateOriginAccessControl
+              - cloudfront:DeleteOriginAccessControl
+              - cloudfront:CreateInvalidation
+              - cloudfront:GetInvalidation
+              - cloudfront:ListCachePolicies
+              - cloudfront:GetCachePolicy
+              - cloudfront:ListOriginRequestPolicies
+              - cloudfront:GetOriginRequestPolicy
+            Resource: "*"
+
+          - Sid: ReadNetwork
+            Effect: Allow
+            Action: ec2:Describe*
+            Resource: "*"
+
+          - Sid: ManageOwnSecurityGroups
+            Effect: Allow
+            Action:
+              - ec2:CreateSecurityGroup
+              - ec2:DeleteSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:AuthorizeSecurityGroupEgress
+              - ec2:RevokeSecurityGroupIngress
+              - ec2:RevokeSecurityGroupEgress
+              - ec2:ModifySecurityGroupRules
+              - ec2:GetManagedPrefixListEntries
+              - ec2:CreateTags
+              - ec2:DeleteTags
+            Resource: "*"
+
+          # VPC にはパブリックサブネットが1枚しかなく ALB が作れないので, もう1枚足す。
+          # 既存のサブネットとルートテーブルには触らない
+          - Sid: ManageProjectNetwork
+            Effect: Allow
+            Action:
+              - ec2:CreateSubnet
+              - ec2:DeleteSubnet
+              - ec2:ModifySubnetAttribute
+              - ec2:CreateRouteTable
+              - ec2:DeleteRouteTable
+              - ec2:CreateRoute
+              - ec2:DeleteRoute
+              - ec2:AssociateRouteTable
+              - ec2:DisassociateRouteTable
+            Resource: "*"
+
+          - Sid: ContainerRegistry
+            Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:CreateRepository
+              - ecr:DeleteRepository
+              - ecr:DescribeRepositories
+              - ecr:DescribeImages
+              - ecr:ListTagsForResource
+              - ecr:TagResource
+              - ecr:UntagResource
+              - ecr:PutLifecyclePolicy
+              - ecr:GetLifecyclePolicy
+              - ecr:DeleteLifecyclePolicy
+              - ecr:SetRepositoryPolicy
+              - ecr:GetRepositoryPolicy
+              - ecr:DeleteRepositoryPolicy
+              - ecr:PutImageScanningConfiguration
+              - ecr:BatchCheckLayerAvailability
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:CompleteLayerUpload
+              - ecr:PutImage
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchDeleteImage
+            Resource: "*"
+
+          - Sid: EcsAndLoadBalancer
+            Effect: Allow
+            Action:
+              - ecs:*
+              - elasticloadbalancing:*
+              - application-autoscaling:*
+            Resource: "*"
+
+          # ターゲット追跡が自分で作るアラーム
+          - Sid: AlarmsCreatedByTargetTracking
+            Effect: Allow
+            Action:
+              - cloudwatch:PutMetricAlarm
+              - cloudwatch:DeleteAlarms
+              - cloudwatch:DescribeAlarms
+              - cloudwatch:GetMetricData
+            Resource: "*"
+
+          - Sid: WebApplicationFirewall
+            Effect: Allow
+            Action: wafv2:*
+            Resource: "*"
+
+          - Sid: Logs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:DeleteLogGroup
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:PutRetentionPolicy
+              - logs:ListTagsForResource
+              - logs:TagResource
+              - logs:UntagResource
+              - logs:GetLogEvents
+              - logs:FilterLogEvents
+            Resource: "*"
+
+          # ロールは roles スタックで作る。CI は作れず, 決まった2本を渡すだけ
+          - Sid: PassOnlyTheTaskRoles
+            Effect: Allow
+            Action: iam:PassRole
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/${AppNamePrefix}-exec"
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/${AppNamePrefix}-task"
+            Condition:
+              StringEquals:
+                iam:PassedToService: ecs-tasks.amazonaws.com
+
+          - Sid: EcsNeedsItsServiceLinkedRoleOnFirstUse
+            Effect: Allow
+            Action: iam:CreateServiceLinkedRole
+            Resource: "*"
+            Condition:
+              StringEquals:
+                iam:AWSServiceName:
+                  - ecs.amazonaws.com
+                  - ecs.application-autoscaling.amazonaws.com
+                  - elasticloadbalancing.amazonaws.com
+
+          # CI はキーの値を使わない. タスク定義に ARN を書くために存在確認するだけ。
+          # ssm:DescribeParameters は資源指定に対応せず必ず拒否されるので入れない
+          - Sid: ReadOpenAiKeyParameter
+            Effect: Allow
+            Action: ssm:GetParameter
+            Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/*"
+
+  # 初期構築だけに要る権限。CI には付けない
+  BootstrapPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${NamePrefix}-bootstrap"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CreateTheTaskRoles
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:PutRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:GetRolePolicy
+              - iam:ListRolePolicies
+              - iam:ListAttachedRolePolicies
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${NamePrefix}-*"
+
+          - Sid: AttachOnlyKnownPolicies
+            Effect: Allow
+            Action: [iam:AttachRolePolicy, iam:DetachRolePolicy]
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${NamePrefix}-*"
+            Condition:
+              ArnLike:
+                iam:PolicyARN:
+                  - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/${NamePrefix}-*"
+
+          - Sid: ManageThisProjectsPolicies
+            Effect: Allow
+            Action:
+              - iam:CreatePolicy
+              - iam:DeletePolicy
+              - iam:GetPolicy
+              - iam:GetPolicyVersion
+              - iam:ListPolicyVersions
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicyVersion
+              - iam:TagPolicy
+              - iam:UntagPolicy
+              - iam:ListPolicyTags
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:policy/${NamePrefix}-*"
+
+          - Sid: GitHubActionsOidcProvider
+            Effect: Allow
+            Action:
+              - iam:CreateOpenIDConnectProvider
+              - iam:GetOpenIDConnectProvider
+              - iam:DeleteOpenIDConnectProvider
+              - iam:TagOpenIDConnectProvider
+              - iam:UntagOpenIDConnectProvider
+              - iam:UpdateOpenIDConnectProviderThumbprint
+              - iam:ListOpenIDConnectProviders
+            Resource: "*"
+
+          # db スタックは CI では流さない。DB の作り直しが毎デプロイで起きてよいことではない
+          - Sid: ManageProjectDatabase
+            Effect: Allow
+            Action:
+              - rds:CreateDBInstance
+              - rds:DeleteDBInstance
+              - rds:ModifyDBInstance
+              - rds:DescribeDBInstances
+              - rds:DescribeDBEngineVersions
+              - rds:CreateDBSnapshot
+              - rds:DeleteDBSnapshot
+              - rds:DescribeDBSnapshots
+              - rds:CreateDBSubnetGroup
+              - rds:DeleteDBSubnetGroup
+              - rds:DescribeDBSubnetGroups
+              - rds:ModifyDBSubnetGroup
+              - rds:AddTagsToResource
+              - rds:RemoveTagsFromResource
+              - rds:ListTagsForResource
+            Resource: "*"
+
+          - Sid: WriteTheSecrets
+            Effect: Allow
+            Action: [ssm:PutParameter, ssm:DeleteParameter, ssm:GetParameter, ssm:AddTagsToResource]
+            Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/prtimes-hackathon/*"
+
 Outputs:
+  BootstrapPolicyArn:
+    Description: 手元の IAM ユーザーにだけアタッチする
+    Value: !Ref BootstrapPolicy
+
+  DeployPolicyArn:
+    Description: 手元の IAM ユーザーにもこれを1度アタッチする。以降の更新は stack 側で流れる
+    Value: !Ref DeployPolicy
+
   DeployRoleArn:
     Description: GitHub Actions の configure-aws-credentials に role-to-assume として渡す
     Value: !GetAtt DeployRole.Arn
