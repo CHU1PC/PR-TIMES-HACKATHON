@@ -18,7 +18,7 @@ def draft(**kwargs: object) -> PlanDraft:
 
 
 def test_place_is_asked_first() -> None:
-    """効果量が最大の place を最初に聞く（docs/findings.md §4）。"""
+    """効果量が最大の place を最初に聞く(docs/findings.md §4)。"""
     assert next_slot(draft()) == "place"
     assert SLOT_ORDER[0] == "place"
 
@@ -52,14 +52,14 @@ def test_all_done_returns_none() -> None:
 
 
 def test_only_place_claims_causality() -> None:
-    """判定クエリC を通った項目だけ causal。他は機能説明に留める（§6.5）。"""
+    """判定クエリC を通った項目だけ causal。他は機能説明に留める(§6.5)。"""
     tones = {s.code: s.tone for s in slot_states(draft())}
     assert tones["place"] == "causal"
     assert {code for code, tone in tones.items() if tone == "causal"} == set(CAUSAL_SLOTS)
 
 
 def test_effects_never_promise_numbers() -> None:
-    """顧客に見せる文言に数値の予測や効果の断定を含めない（制約1・3）。"""
+    """顧客に見せる文言に数値の予測や効果の断定を含めない(制約1・3)。"""
     forbidden = ("%", "％", "倍", "スコア", "点", "予測", "増えます", "見込め")
     for state in slot_states(draft()):
         assert not any(word in state.effect for word in forbidden), state.effect
