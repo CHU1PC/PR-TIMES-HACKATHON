@@ -3,45 +3,38 @@ import type { z } from "zod";
 import type {
   calendarEventSchema,
   calendarEventsSchema,
-  calendarRangeSchema,
   calendarStatusSchema,
   candidateSchema,
+  eventQuerySchema,
   exchangeSchema,
   hearingResponseSchema,
   hearingTurnSchema,
-  planCategorySchema,
   planDraftSchema,
-  presenceSchema,
   proposalCaseSchema,
   proposalRequestSchema,
   proposalResponseSchema,
-  slotCodeSchema,
   slotStateSchema,
   sparringResponseSchema,
   sparringTurnSchema,
   suggestionSchema,
-  toneSchema,
-  yesNoSchema,
 } from "@/lib/schemas";
-
-export type SlotCode = z.infer<typeof slotCodeSchema>;
-
-export type PlanCategory = z.infer<typeof planCategorySchema>;
-
-/** 当日その場に人がいるか。null は「まだ聞いていない」 */
-export type Presence = z.infer<typeof presenceSchema>;
-
-/** すでにある動画の有無。null は「まだ聞いていない」 */
-export type YesNo = z.infer<typeof yesNoSchema>;
-
-/** causal は判定クエリC を通ったスロットのみ */
-export type Tone = z.infer<typeof toneSchema>;
 
 export type PlanDraft = z.infer<typeof planDraftSchema>;
 
-export type SparringTurn = z.infer<typeof sparringTurnSchema>;
-
 export type SlotState = z.infer<typeof slotStateSchema>;
+
+export type SlotCode = SlotState["code"];
+
+/** causal は判定クエリC を通ったスロットのみ */
+export type Tone = SlotState["tone"];
+
+/** 当日その場に人がいるか。null は「まだ聞いていない」 */
+export type Presence = NonNullable<PlanDraft["people"]>;
+
+/** すでにある動画の有無。null は「まだ聞いていない」 */
+export type YesNo = NonNullable<PlanDraft["video"]>;
+
+export type SparringTurn = z.infer<typeof sparringTurnSchema>;
 
 export type SparringResponse = z.infer<typeof sparringResponseSchema>;
 
@@ -50,6 +43,9 @@ export type Exchange = z.infer<typeof exchangeSchema>;
 export type HearingTurn = z.infer<typeof hearingTurnSchema>;
 
 export type Candidate = z.infer<typeof candidateSchema>;
+
+/** requirements §6.2 の8分類 */
+export type PlanCategory = Candidate["category"];
 
 export type HearingResponse = z.infer<typeof hearingResponseSchema>;
 
@@ -65,7 +61,8 @@ export type ProposalRequest = z.infer<typeof proposalRequestSchema>;
 /** Google カレンダーの予定1件。キーは Google Calendar API の名前のまま */
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 
-export type CalendarRange = z.infer<typeof calendarRangeSchema>;
+/** 予定を引く期間。キーもサーバーに合わせて camelCase */
+export type CalendarRange = z.infer<typeof eventQuerySchema>;
 
 export type CalendarStatus = z.infer<typeof calendarStatusSchema>;
 

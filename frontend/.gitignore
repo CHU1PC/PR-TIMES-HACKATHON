@@ -12,9 +12,6 @@ dist
 dist-ssr
 *.local
 
-# kubb の生成物。openapi.json から bun run generate:api で作り直す
-src/gen
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

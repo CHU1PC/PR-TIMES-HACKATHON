@@ -5,8 +5,7 @@
         "description": "カレンダーの予定1件。",
         "properties": {
           "description": {
-            "default": "",
-            "description": "予定の詳細",
+            "description": "予定の詳細。無ければ空文字",
             "title": "Description",
             "type": "string"
           },
@@ -33,8 +32,7 @@
             "type": "string"
           },
           "location": {
-            "default": "",
-            "description": "場所",
+            "description": "場所。無ければ空文字",
             "title": "Location",
             "type": "string"
           },
@@ -64,8 +62,12 @@
         "required": [
           "id",
           "title",
+          "description",
+          "location",
           "start",
-          "end"
+          "end",
+          "htmlLink",
+          "status"
         ],
         "title": "CalendarEvent",
         "type": "object"
@@ -88,7 +90,8 @@
           }
         },
         "required": [
-          "connected"
+          "connected",
+          "events"
         ],
         "title": "CalendarEvents",
         "type": "object"
@@ -155,119 +158,6 @@
           "reason"
         ],
         "title": "Candidate",
-        "type": "object"
-      },
-      "Case": {
-        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。",
-        "properties": {
-          "body_head": {
-            "default": "",
-            "description": "本文冒頭をHTML除去して1000文字。全文は定型文が大半で取らない",
-            "title": "Body Head",
-            "type": "string"
-          },
-          "business_category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "業種名",
-            "title": "Business Category"
-          },
-          "city": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "市区町村名",
-            "title": "City"
-          },
-          "company_id": {
-            "description": "PR TIMES 側の企業ID",
-            "title": "Company Id",
-            "type": "integer"
-          },
-          "company_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "配信企業名",
-            "title": "Company Name"
-          },
-          "media": {
-            "description": "この事例を拾った媒体のうち特徴的なもの",
-            "items": {
-              "type": "string"
-            },
-            "title": "Media",
-            "type": "array"
-          },
-          "prefecture": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "都道府県名",
-            "title": "Prefecture"
-          },
-          "published_on": {
-            "description": "配信日 YYYY-MM-DD",
-            "title": "Published On",
-            "type": "string"
-          },
-          "release_id": {
-            "description": "企業内でのリリースID",
-            "title": "Release Id",
-            "type": "integer"
-          },
-          "release_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "リリース種別名",
-            "title": "Release Type"
-          },
-          "subtitle": {
-            "default": "",
-            "description": "サブタイトル。lead_paragraph の代替(2026年の充填率74%)",
-            "title": "Subtitle",
-            "type": "string"
-          },
-          "title": {
-            "description": "リリースのタイトル",
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "company_id",
-          "release_id",
-          "title",
-          "published_on"
-        ],
-        "title": "Case",
         "type": "object"
       },
       "EventQuery": {
@@ -386,6 +276,8 @@
         },
         "required": [
           "history",
+          "question",
+          "hint",
           "candidates",
           "done"
         ],
@@ -549,6 +441,120 @@
         "title": "PlanDraft",
         "type": "object"
       },
+      "ProposalCase": {
+        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。",
+        "properties": {
+          "body_head": {
+            "default": "",
+            "description": "本文冒頭をHTML除去して1000文字。全文は定型文が大半で取らない",
+            "title": "Body Head",
+            "type": "string"
+          },
+          "business_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "業種名",
+            "title": "Business Category"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "市区町村名",
+            "title": "City"
+          },
+          "company_id": {
+            "description": "PR TIMES 側の企業ID",
+            "title": "Company Id",
+            "type": "integer"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "配信企業名",
+            "title": "Company Name"
+          },
+          "media": {
+            "description": "この事例を拾った媒体のうち特徴的なもの",
+            "items": {
+              "type": "string"
+            },
+            "title": "Media",
+            "type": "array"
+          },
+          "prefecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "都道府県名",
+            "title": "Prefecture"
+          },
+          "published_on": {
+            "description": "配信日 YYYY-MM-DD",
+            "title": "Published On",
+            "type": "string"
+          },
+          "release_id": {
+            "description": "企業内でのリリースID",
+            "title": "Release Id",
+            "type": "integer"
+          },
+          "release_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "リリース種別名",
+            "title": "Release Type"
+          },
+          "subtitle": {
+            "default": "",
+            "description": "サブタイトル。lead_paragraph の代替(2026年の充填率74%)",
+            "title": "Subtitle",
+            "type": "string"
+          },
+          "title": {
+            "description": "リリースのタイトル",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "company_id",
+          "release_id",
+          "title",
+          "published_on",
+          "media"
+        ],
+        "title": "ProposalCase",
+        "type": "object"
+      },
       "ProposalRequest": {
         "description": "提案の入力。壁打ちが完了した draft をそのまま渡す。",
         "properties": {
@@ -569,7 +575,7 @@
           "cases": {
             "description": "根拠にした事例",
             "items": {
-              "$ref": "#/components/schemas/Case"
+              "$ref": "#/components/schemas/ProposalCase"
             },
             "title": "Cases",
             "type": "array"
@@ -593,7 +599,8 @@
         },
         "required": [
           "suggestions",
-          "cases"
+          "cases",
+          "media"
         ],
         "title": "ProposalResponse",
         "type": "object"
@@ -702,6 +709,8 @@
         },
         "required": [
           "draft",
+          "question",
+          "hint",
           "slots",
           "ready"
         ],
@@ -752,7 +761,8 @@
         },
         "required": [
           "action",
-          "reason"
+          "reason",
+          "cited"
         ],
         "title": "Suggestion",
         "type": "object"
