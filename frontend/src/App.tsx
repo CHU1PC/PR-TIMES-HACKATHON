@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { AppSidebar } from "@/components/AppSidebar";
 import { EntryPage } from "@/pages/EntryPage";
 import { HearingPage } from "@/pages/HearingPage";
 import { ProposalPage } from "@/pages/ProposalPage";
@@ -30,8 +31,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <AppHeader />
-      <main className="app-main">{page}</main>
+      <AppSidebar currentPath={path} />
+      <div className="app__body">
+        <AppHeader currentPath={path} />
+        <main className="app-main">{page}</main>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from "react";
 
 export interface RouteLocation {
   /** 現在のパス */
@@ -46,20 +46,19 @@ export function useQueryParam(key: string): string | null {
   return new URLSearchParams(search).get(key);
 }
 
-interface LinkProps {
+interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   to: string;
-  className?: string;
-  children: ReactNode;
 }
 
-export function Link({ to, className, children }: LinkProps) {
+export function Link({ to, children, onClick, ...anchorProps }: LinkProps) {
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    onClick?.(event);
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     navigate(to);
   };
   return (
-    <a href={to} className={className} onClick={handleClick}>
+    <a {...anchorProps} href={to} onClick={handleClick}>
       {children}
     </a>
   );
