@@ -6,7 +6,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ currentPath }: AppHeaderProps) {
-  const isHome = currentPath === "/" || currentPath === "";
+  const isEntry = currentPath === "/entry";
 
   return (
     <header className="app-header">
@@ -21,15 +21,15 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
           AIと一緒にPRネタを整理
         </p>
 
-        {isHome ? (
-          <a href="#new-plan" className="app-header__action">
-            <Icon name="plus" size={19} />
-            <span>予定を追加</span>
-          </a>
+        {isEntry ? (
+          <Link to="/" className="app-header__action app-header__action--secondary">
+            <Icon name="arrow-left" size={19} />
+            <span>ホームへ戻る</span>
+          </Link>
         ) : (
-          <Link to="/" className="app-header__action">
+          <Link to="/entry" className="app-header__action">
             <Icon name="plus" size={19} />
-            <span>新しい予定</span>
+            <span>イベントを追加</span>
           </Link>
         )}
       </div>

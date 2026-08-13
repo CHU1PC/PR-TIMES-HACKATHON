@@ -1,13 +1,19 @@
 import type { ReactNode } from "react";
 
 export type IconName =
+  | "arrow-left"
   | "arrow-right"
+  | "calendar"
   | "check"
+  | "chevron-left"
+  | "chevron-right"
+  | "eye"
   | "home"
   | "lightbulb"
   | "location"
   | "message"
   | "plus"
+  | "ranking"
   | "search"
   | "sparkles";
 
@@ -18,13 +24,33 @@ interface IconProps {
 }
 
 const paths: Record<IconName, ReactNode> = {
+  "arrow-left": (
+    <>
+      <path d="M19 12H5" />
+      <path d="m11 18-6-6 6-6" />
+    </>
+  ),
   "arrow-right": (
     <>
       <path d="M5 12h14" />
       <path d="m13 6 6 6-6 6" />
     </>
   ),
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M16 3v4M8 3v4M3 10h18" />
+    </>
+  ),
   check: <path d="m5 12 4 4L19 6" />,
+  "chevron-left": <path d="m15 18-6-6 6-6" />,
+  "chevron-right": <path d="m9 18 6-6-6-6" />,
+  eye: (
+    <>
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </>
+  ),
   home: (
     <>
       <path d="m3 11 9-8 9 8" />
@@ -52,6 +78,13 @@ const paths: Record<IconName, ReactNode> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  ranking: (
+    <>
+      <path d="M8 21h8M12 17v4" />
+      <path d="M7 4h10v4a5 5 0 0 1-10 0V4Z" />
+      <path d="M7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4" />
+    </>
+  ),
   search: (
     <>
       <circle cx="10.5" cy="10.5" r="6.5" />

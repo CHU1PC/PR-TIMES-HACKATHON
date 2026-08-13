@@ -4,8 +4,9 @@ import { AskPanel } from "@/components/AskPanel";
 import { ChatLog } from "@/components/ChatLog";
 import { ReplyForm } from "@/components/ReplyForm";
 import { TurnStatus } from "@/components/TurnStatus";
+import { isValidDate } from "@/lib/date";
 import { clearHearing, loadHearing, saveHearing, type ChatMessage, type HearingSession } from "@/lib/session";
-import { navigate } from "@/router";
+import { navigate, useQueryParam } from "@/router";
 import type { HearingTurn } from "@/types";
 
 const EMPTY_SESSION: HearingSession = {
@@ -25,6 +26,8 @@ function doneMessage(session: HearingSession): string | null {
 }
 
 export function HearingPage() {
+  const dateParam = useQueryParam("date");
+  const selectedDate = isValidDate(dateParam) ? dateParam : null;
   const [session, setSession] = useState<HearingSession | null>(null);
   const [resumed, setResumed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -149,7 +152,11 @@ export function HearingPage() {
                   <button
                     type="button"
                     className="button button--primary"
-                    onClick={() => navigate(`/sparring?title=${encodeURIComponent(candidate.title)}`)}
+                    onClick={() => {
+                      const params = new URLSearchParams({ title: candidate.title });
+                      if (selectedDate) params.set("date", selectedDate);
+                      navigate(`/sparring?${params.toString()}`);
+                    }}
                   >
                     この予定で進む
                   </button>

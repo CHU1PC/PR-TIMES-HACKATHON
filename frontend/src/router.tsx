@@ -5,10 +5,12 @@ export interface RouteLocation {
   path: string;
   /** ?から始まるクエリ文字列 */
   search: string;
+  /** #から始まるページ内リンク */
+  hash: string;
 }
 
 function readLocation(): RouteLocation {
-  return { path: window.location.pathname, search: window.location.search };
+  return { path: window.location.pathname, search: window.location.search, hash: window.location.hash };
 }
 
 const listeners = new Set<() => void>();
@@ -21,7 +23,16 @@ export function navigate(to: string, options?: { replace?: boolean }): void {
   if (options?.replace) window.history.replaceState({}, "", to);
   else window.history.pushState({}, "", to);
   emit();
-  window.scrollTo(0, 0);
+  const targetHash = new URL(to, window.location.href).hash;
+  if (targetHash) {
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(targetHash.slice(1));
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      target?.scrollIntoView({ behavior, block: "start" });
+    });
+  } else {
+    window.scrollTo(0, 0);
+  }
 }
 
 export function useRouteLocation(): RouteLocation {
@@ -31,10 +42,12 @@ export function useRouteLocation(): RouteLocation {
     const update = () => setLocation(readLocation());
     listeners.add(update);
     window.addEventListener("popstate", update);
+    window.addEventListener("hashchange", update);
     update();
     return () => {
       listeners.delete(update);
       window.removeEventListener("popstate", update);
+      window.removeEventListener("hashchange", update);
     };
   }, []);
 
