@@ -3,11 +3,15 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """環境変数から読む。ローカルは `uv run --env-file ../.env`, 本番は compose が渡す。"""
+    """環境変数から読む。ローカルは `uv run --env-file ../.env`, 本番は ECS が Parameter Store から渡す。"""
 
     DATABASE_URL: SecretStr = Field(
         default=SecretStr(""),
-        description="データベース接続用の URL。ローカルは SSH トンネル, 本番は RDS を直に指す",
+        description="このアプリの RDS。API と alembic と etl.load_corpus が書き込む",
+    )
+    SOURCE_DATABASE_URL: SecretStr = Field(
+        default=SecretStr(""),
+        description="主催者の RDS。etl の抽出だけが読む。DDL は打たない",
     )
     OPENAI_API_KEY: SecretStr = Field(default=SecretStr(""), description="OpenAI の API キー")
 
