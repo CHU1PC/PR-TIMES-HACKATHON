@@ -225,26 +225,23 @@ export function HomePage() {
                     const weekendClass = weekdayIndex === 0 ? " is-sunday" : weekdayIndex === 6 ? " is-saturday" : "";
                     return (
                       <td key={day.key} className={!day.isCurrentMonth ? "is-outside" : undefined}>
-                        {/* セルごとリンクにすると1日に2件あるとき2件目を選べない。予定ごとにリンクを張る */}
-                        <div
-                          className={`calendar-day${dayEvents.length > 0 ? " has-event" : " calendar-day--empty"}${day.isToday ? " is-today" : ""}`}
+                        {/* 日付だけ渡す。その日に何件あってもどれを扱うかは入口の画面で選ぶ */}
+                        <Link
+                          to={entryPath(day.key)}
+                          className={`calendar-day${dayEvents.length > 0 ? " has-event" : ""}${day.isToday ? " is-today" : ""}`}
+                          aria-label={`${formatDate(day.key)}を選択`}
                           aria-current={day.isToday ? "date" : undefined}
                         >
                           <span className={`calendar-day__number${weekendClass}`}>{day.date.getDate()}</span>
                           {shown.map((event) => (
-                            <Link
-                              key={event.id}
-                              to={entryPath(day.key, event.title)}
-                              className="calendar-event calendar-event--blue"
-                              aria-label={`${formatDate(day.key)}、${event.title}を選択`}
-                            >
+                            <span key={event.id} className="calendar-event calendar-event--blue">
                               <span aria-hidden="true" />
                               <span className="calendar-event__title">{event.title}</span>
                               <span className="calendar-event__compact" aria-hidden="true">予定</span>
-                            </Link>
+                            </span>
                           ))}
                           {hidden > 0 ? <span className="calendar-event__more">ほか{hidden}件</span> : null}
-                        </div>
+                        </Link>
                       </td>
                     );
                   })}

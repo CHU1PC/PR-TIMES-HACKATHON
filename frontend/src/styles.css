@@ -728,11 +728,10 @@ textarea:focus-visible {
   background: #fcfcfe;
 }
 
-/* クリックできるのは中の予定チップ。セル自体はもう遷移しない */
 .calendar-day {
   background: transparent;
   border: 0;
-  cursor: default;
+  cursor: pointer;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -744,8 +743,16 @@ textarea:focus-visible {
   width: 100%;
 }
 
-.calendar-day--empty {
-  cursor: default;
+.calendar-day:hover {
+  background: #faf7ff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 139, 0.3);
+}
+
+.calendar-day:focus-visible {
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 139, 0.48);
+  outline: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .is-outside .calendar-day {
@@ -776,7 +783,6 @@ textarea:focus-visible {
 .calendar-event {
   align-items: flex-start;
   border-radius: 6px;
-  cursor: pointer;
   display: flex;
   font-size: 10px;
   font-weight: 700;
@@ -785,16 +791,6 @@ textarea:focus-visible {
   margin-top: 4px;
   max-width: 100%;
   padding: 4px 5px;
-  text-decoration: none;
-}
-
-.calendar-event:hover {
-  filter: brightness(0.94);
-}
-
-.calendar-event:focus-visible {
-  outline: 2px solid #00008b;
-  outline-offset: 1px;
 }
 
 .calendar-event > span:first-child {
@@ -1207,6 +1203,47 @@ textarea:focus-visible {
   color: var(--ink-soft);
   font-size: 13px;
   margin: 17px 0 20px;
+}
+
+.entry__picks {
+  margin: 0 0 20px;
+}
+
+.entry__picks-label {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.entry__picks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry__pick {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 7px 14px;
+  text-align: left;
+}
+
+.entry__pick:hover {
+  border-color: #00008b;
+  color: #00008b;
+}
+
+.entry__pick.is-selected {
+  background: rgba(0, 0, 139, 0.07);
+  border-color: #00008b;
+  color: #00008b;
+  font-weight: 700;
 }
 
 .entry--dashboard .entry__label {
