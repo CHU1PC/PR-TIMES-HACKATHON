@@ -44,6 +44,14 @@ cd frontend && bun run dev
 docker compose up --build
 ```
 
+`db` と `migrate` も一緒に立つので, これだけで API が応答する。踏み台のトンネルは要らない。
+コーパスは入らないので `/api/proposal` は空を返す。本番の RDS を見たい場合だけ
+`.env` に `DATABASE_URL` を書いてトンネルを張る。
+
+```bash
+docker compose down -v   # DB のデータごと捨てる
+```
+
 ## デプロイされるもの
 
 `main` への push(または Actions タブから手動実行)で、この順に走る。
