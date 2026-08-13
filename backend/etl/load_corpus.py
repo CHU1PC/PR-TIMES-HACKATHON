@@ -93,16 +93,6 @@ LOOKUPS = (
 )
 
 
-def dsn() -> str:
-    """DATABASE_URL を psycopg ドライバ指定の SQLAlchemy URL に揃える。
-
-    Returns:
-        postgresql+psycopg:// で始まる接続 URL。
-    """
-    url = make_url(settings.DATABASE_URL.get_secret_value())
-    return url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
-
-
 def ensure_tables(engine: Engine) -> None:
     """投入先が migration 済みか確かめる。
 
@@ -117,17 +107,6 @@ def ensure_tables(engine: Engine) -> None:
     if missing:
         msg = f"テーブルが無い: {', '.join(missing)}。{MIGRATE_HINT}"
         raise RuntimeError(msg)
-
-
-def truncate(pg: psycopg.Connection[Any]) -> None:
-    """投入先を空にする。何度実行しても同じ結果になるよう連番も戻す。
-
-    Args:
-        pg: 投入先への psycopg 接続。
-    """
-    with pg.cursor() as cur:
-        cur.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY")
-    logger.info("TRUNCATE {}", ", ".join(TABLES))
 
 
 def fetch(con: duckdb.DuckDBPyConnection, sql: str) -> Iterator[tuple[Any, ...]]:
@@ -225,7 +204,8 @@ def verify(engine: Engine, vectors: int) -> None:
 
 def main() -> None:
     """手元の parquet と npy を PostgreSQL(pgvector) に投入する。"""
-    engine = create_engine(dsn())
+    url = make_url(settings.DATABASE_URL.get_secret_value()).set(drivername="postgresql+psycopg")
+    engine = create_engine(url.render_as_string(hide_password=False))
     ensure_tables(engine)
 
     vectors = np.load(VECTORS)
@@ -235,7 +215,10 @@ def main() -> None:
     raw = engine.raw_connection()
     try:
         pg = raw.driver_connection
-        truncate(pg)
+        # 何度実行しても同じ結果になるよう連番も戻す
+        with pg.cursor() as cur:
+            cur.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY")
+        logger.info("TRUNCATE {}", ", ".join(TABLES))
         load(pg, vectors)
         raw.commit()
     finally:

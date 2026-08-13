@@ -69,20 +69,6 @@ def targets() -> list[tuple[int, int]]:
         ).fetchall()
 
 
-def values_clause(pairs: list[tuple[int, int]]) -> str:
-    """VALUES 句を組み立てる。先頭だけ型を明示して JOIN の型を揃える。
-
-    Args:
-        pairs: (company_id, release_id) の並び。
-
-    Returns:
-        SQL に埋める VALUES の中身。
-    """
-    head, *rest = pairs
-    first = f"({head[0]}::bigint, {head[1]}::bigint)"
-    return ", ".join([first, *(f"({c}, {r})" for c, r in rest)])
-
-
 async def dump(conn: psycopg.AsyncConnection, sql: str, path: Path) -> int:
     """COPY の結果を gzip で書き出す。
 
@@ -115,7 +101,9 @@ async def fetch_chunk(index: int, pairs: list[tuple[int, int]], kinds: list[str]
         kinds: "text" と "media" のうち実行するもの。
         sem: 同時実行数を絞るセマフォ。
     """
-    values = values_clause(pairs)
+    # 先頭だけ型を明示して JOIN の型を揃える
+    head, *rest = pairs
+    values = ", ".join([f"({head[0]}::bigint, {head[1]}::bigint)", *(f"({c}, {r})" for c, r in rest)])
     plans = {
         "text": (TEXT_SQL.format(chars=BODY_RAW_CHARS, pairs=values), OUT / f"ctext_{index:04d}.csv.gz"),
         "media": (MEDIA_SQL.format(pairs=values, self_media=SELF_MEDIA), OUT / f"cmedia_{index:04d}.csv.gz"),

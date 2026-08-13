@@ -2,7 +2,7 @@ import functools
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from app.settings import API_STATEMENT_TIMEOUT, settings
 
@@ -19,18 +19,6 @@ POOL_SIZE = 5
 MAX_OVERFLOW = 5
 
 
-def async_url() -> str:
-    """DATABASE_URL を async ドライバ付きの形に直す。
-
-    Returns:
-        create_async_engine に渡す URL。
-    """
-    url = settings.DATABASE_URL.get_secret_value()
-    if url.startswith(SYNC_SCHEME):
-        return ASYNC_SCHEME + url[len(SYNC_SCHEME) :]
-    return url
-
-
 @functools.cache
 def engine() -> AsyncEngine:
     """エンジンを初回参照時に1つだけ作る。import では接続しない。
@@ -38,23 +26,16 @@ def engine() -> AsyncEngine:
     Returns:
         使い回す非同期エンジン。
     """
+    url = settings.DATABASE_URL.get_secret_value()
+    if url.startswith(SYNC_SCHEME):
+        url = ASYNC_SCHEME + url[len(SYNC_SCHEME) :]
     return create_async_engine(
-        async_url(),
+        url,
         pool_size=POOL_SIZE,
         max_overflow=MAX_OVERFLOW,
         pool_pre_ping=True,
         connect_args={"options": CONNECT_OPTIONS},
     )
-
-
-@functools.cache
-def _sessions() -> async_sessionmaker[AsyncSession]:
-    """セッション生成器を1つだけ持つ。
-
-    Returns:
-        使い回す async_sessionmaker。
-    """
-    return async_sessionmaker(engine(), expire_on_commit=False)
 
 
 @asynccontextmanager
@@ -64,5 +45,5 @@ async def session() -> AsyncGenerator[AsyncSession]:
     Yields:
         非同期セッション。
     """
-    async with _sessions()() as opened:
+    async with AsyncSession(engine(), expire_on_commit=False) as opened:
         yield opened
