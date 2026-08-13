@@ -21,6 +21,9 @@ env:
   AWS_REGION: ap-northeast-1
   ECR_STACK: prtimes-hackathon-ecr
   DB_STACK: prtimes-hackathon-db
+  IAM_STACK: prtimes-hackathon-oidc
+  ROLES_STACK: prtimes-hackathon-roles
+  WAF_STACK: prtimes-hackathon-waf
   APP_STACK: prtimes-hackathon-app
 
 jobs:
@@ -86,6 +89,14 @@ jobs:
           echo "uri=$uri" >> "$GITHUB_OUTPUT"
 
       # === インフラ ===
+      # CLOUDFRONT スコープの WebACL は us-east-1 にしか作れない
+      - name: WAF スタックを流す（us-east-1）
+        run: |
+          aws cloudformation deploy --region us-east-1 \
+            --template-file infra/waf.yaml \
+            --stack-name "$WAF_STACK" \
+            --no-fail-on-empty-changeset
+
       - name: VPC に紐づく値を引く
         id: net
         env:
@@ -102,9 +113,23 @@ jobs:
           # コーパス DB の SG。app スタックはここへ「タスクから :5432」を1本足す
           dbsg=$(aws cloudformation describe-stacks --stack-name "$DB_STACK" \
             --query 'Stacks[0].Outputs[?OutputKey==`SecurityGroupId`].OutputValue' --output text)
+          exec_role=$(aws cloudformation describe-stacks --stack-name "$ROLES_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`ExecutionRoleArn`].OutputValue' --output text)
+          task_role=$(aws cloudformation describe-stacks --stack-name "$ROLES_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`TaskRoleArn`].OutputValue' --output text)
+          acl=$(aws cloudformation describe-stacks --region us-east-1 --stack-name "$WAF_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebAclArn`].OutputValue' --output text)
+          # ログに出さない。CloudFront が付ける秘密のヘッダ
+          verify=$(aws ssm get-parameter --name /prtimes-hackathon/origin-verify \
+            --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$verify"
           echo "prefix_list=$pl" >> "$GITHUB_OUTPUT"
           echo "igw=$igw" >> "$GITHUB_OUTPUT"
           echo "db_sg=$dbsg" >> "$GITHUB_OUTPUT"
+          echo "exec_role=$exec_role" >> "$GITHUB_OUTPUT"
+          echo "task_role=$task_role" >> "$GITHUB_OUTPUT"
+          echo "web_acl=$acl" >> "$GITHUB_OUTPUT"
+          echo "verify=$verify" >> "$GITHUB_OUTPUT"
 
       - name: app スタックを流す
         run: |
@@ -119,6 +144,10 @@ jobs:
               InternetGatewayId='${{ steps.net.outputs.igw }}' \
               CloudFrontPrefixListId='${{ steps.net.outputs.prefix_list }}' \
               DbSecurityGroupId='${{ steps.net.outputs.db_sg }}' \
+              ExecutionRoleArn='${{ steps.net.outputs.exec_role }}' \
+              TaskRoleArn='${{ steps.net.outputs.task_role }}' \
+              WebAclArn='${{ steps.net.outputs.web_acl }}' \
+              OriginVerifySecret='${{ steps.net.outputs.verify }}' \
               ImageUri='${{ steps.image.outputs.uri }}'
 
       # 同じコミットを流し直すと change set が空になり, 新しいイメージでも入れ替わらない
