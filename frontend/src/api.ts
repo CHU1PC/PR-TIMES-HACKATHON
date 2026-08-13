@@ -63,13 +63,9 @@ function failureOf(error: unknown): ApiFailure {
   return { kind: "network", message: MESSAGES.network };
 }
 
-async function request<T>(
-  path: string,
-  init: RequestInit,
-  schema: z.ZodType<T>,
-  signal?: AbortSignal,
-  timeoutMs: number = TIMEOUT_MS,
-): Promise<ApiResult<T>> {
+type Sent = { ok: true; response: Response } | ({ ok: false } & ApiFailure);
+
+async function send(path: string, init: RequestInit, signal: AbortSignal | undefined, timeoutMs: number): Promise<Sent> {
   // 呼び出し側の中断とタイムアウトの両方で切る
   const timeout = AbortSignal.timeout(timeoutMs);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -80,7 +76,23 @@ async function request<T>(
       return { ok: false, kind: "unauthorized", message: MESSAGES.unauthorized };
     }
     if (!response.ok) return { ok: false, kind: "server", message: MESSAGES.server };
-    const payload: unknown = await response.json();
+    return { ok: true, response };
+  } catch (error) {
+    return { ok: false, ...failureOf(error) };
+  }
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit,
+  schema: z.ZodType<T>,
+  signal?: AbortSignal,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<ApiResult<T>> {
+  const sent = await send(path, init, signal, timeoutMs);
+  if (!sent.ok) return sent;
+  try {
+    const payload: unknown = await sent.response.json();
     const parsed = schema.safeParse(payload);
     if (!parsed.success) return { ok: false, kind: "malformed", message: MESSAGES.malformed };
     return { ok: true, data: parsed.data };
@@ -103,7 +115,6 @@ function post<T>(
   };
   return request(path, init, schema, signal, timeoutMs);
 }
-
 
 export function sparringStep(turn: SparringTurn, signal?: AbortSignal): Promise<ApiResult<SparringResponse>> {
   return post<SparringResponse>("/api/sparring/step", turn, sparringResponseSchema, signal);
@@ -137,4 +148,12 @@ export function calendarEvents(range: CalendarRange, signal?: AbortSignal): Prom
 /** 連携はブラウザごと Google へ送るので, fetch せず遷移先だけ返す */
 export function calendarLoginUrl(): string {
   return `${API_BASE}/api/calendar/login`;
+}
+
+/** 資格情報を消して Google 側にも取り消しを伝える。204 なので本文は読まない */
+export async function calendarDisconnect(signal?: AbortSignal): Promise<ApiResult<null>> {
+  const init: RequestInit = { ...WITH_SESSION, method: "DELETE" };
+  const sent = await send("/api/calendar/connection", init, signal, TIMEOUT_MS);
+  if (!sent.ok) return sent;
+  return { ok: true, data: null };
 }

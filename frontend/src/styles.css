@@ -1993,6 +1993,18 @@ textarea:focus-visible {
   margin-bottom: 20px;
 }
 
+.calendar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.calendar__head .calendar__title {
+  margin-bottom: 0;
+}
+
 .calendar__body {
   margin-top: 16px;
 }
