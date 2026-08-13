@@ -594,10 +594,10 @@ ssh -i <key.pem> -N \
   -L 15432:prtimes-hackathon-2026summer-db.cnum2840eavk.ap-northeast-1.rds.amazonaws.com:5432 \
   ubuntu@13.112.91.188
 
-# ETL（DATABASE_URL はトンネルを指す。一度きり・実行済み）
+# ETL（一度きり・実行済み）。抽出は SOURCE_DATABASE_URL, 投入は DATABASE_URL を見る
 cd backend
 uv run --group etl --env-file ../.env python -m etl.extract
-uv run --group etl --env-file ../.env python -m etl.load_duckdb
+uv run --group etl --env-file ../.env python -m etl.load_corpus
 
 # API（ローカル）
 uv run --env-file ../.env fastapi dev
