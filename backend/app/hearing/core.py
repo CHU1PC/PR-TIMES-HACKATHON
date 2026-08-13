@@ -11,20 +11,6 @@ _chain: Runnable[dict[str, str], HearingStep] = PROMPT | chatgpt.with_structured
 MAX_EXCHANGES = 6
 
 
-def format_history(history: list[Exchange]) -> str:
-    """往復をプロンプトに埋める形に整える。
-
-    Args:
-        history: ここまでの往復。
-
-    Returns:
-        「Q: ... A: ...」を並べた文字列。空なら「(まだ何も聞いていません)」。
-    """
-    if not history:
-        return "(まだ何も聞いていません)"
-    return "\n\n".join(f"Q: {e.question}\nA: {e.answer}" for e in history)
-
-
 async def step(history: list[Exchange], answer: str) -> HearingResponse:
     """聞き取りを1往復進める。
 
@@ -39,7 +25,8 @@ async def step(history: list[Exchange], answer: str) -> HearingResponse:
     if answer.strip() and updated:
         updated[-1] = Exchange(question=updated[-1].question, answer=answer.strip())
 
-    result = await _chain.ainvoke({"history": format_history(updated)})
+    formatted = "\n\n".join(f"Q: {e.question}\nA: {e.answer}" for e in updated) or "(まだ何も聞いていません)"
+    result = await _chain.ainvoke({"history": formatted})
     candidates = [
         Candidate(title=p.title, category=p.category, source=p.source, reason=p.reason) for p in result.candidates
     ]

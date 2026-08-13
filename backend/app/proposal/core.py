@@ -42,19 +42,6 @@ async def categories() -> dict[str, int]:
     return _categories
 
 
-def query_text(draft: PlanDraft) -> str:
-    """予定を検索クエリの文字列にする。コーパス側は title を埋め込んでいるので語をそのまま並べる。
-
-    Args:
-        draft: 壁打ちで埋めたイベント内容。
-
-    Returns:
-        埋め込みに渡す文字列。
-    """
-    parts = [draft.title, draft.place, *draft.partner, draft.novelty, draft.observation]
-    return " ".join(p for p in parts if p)
-
-
 def format_cases(cases: list[Case]) -> str:
     """事例をプロンプトに埋める形に整える。**転載件数は渡さない。**
 
@@ -101,7 +88,8 @@ async def propose(draft: PlanDraft) -> ProposalResponse:
         提案3件と, 根拠にした事例。
     """
     prefecture_id = await resolve_prefecture(draft.place)
-    business_category_id, vector = await asyncio.gather(classify(draft), embed(query_text(draft)))
+    parts = [draft.title, draft.place, *draft.partner, draft.novelty, draft.observation]
+    business_category_id, vector = await asyncio.gather(classify(draft), embed(" ".join(p for p in parts if p)))
     cases = await search(vector, business_category_id=business_category_id, prefecture_id=prefecture_id, top_k=TOP_K)
     logger.info("検索 業種={} 都道府県={} 事例={}件", business_category_id, prefecture_id, len(cases))
 

@@ -15,18 +15,6 @@ MIN_SHORT_LENGTH = 2
 PLACES_SQL = text("SELECT kind, name, prefecture_id FROM places ORDER BY prefecture_id, name")
 
 
-def shorten(name: str) -> str:
-    """都道府県名から接尾辞を1文字だけ落とす。
-
-    Args:
-        name: 「東京都」「京都府」など。
-
-    Returns:
-        「東京」「京都」など。rstrip だと「京都府」が「京」まで削れて別の地名に当たる。
-    """
-    return name[:-1] if len(name) > MIN_SHORT_LENGTH and name[-1] in DROPPABLE_SUFFIXES else name
-
-
 # places は数千行と小さいので初回に読み切って使い回す（async 関数には functools.cache が使えない）
 _prefectures: dict[str, int] = {}
 _cities: list[tuple[str, int]] = []
@@ -67,7 +55,8 @@ async def resolve_prefecture(place: str | None) -> int | None:
         if name in place:
             return pref
     for name, pref in prefectures.items():
-        if shorten(name) in place:
+        short = name[:-1] if len(name) > MIN_SHORT_LENGTH and name[-1] in DROPPABLE_SUFFIXES else name
+        if short in place:
             return pref
 
     # 市区町村名は「中央区」のように県をまたいで重複する。一致した数が多い県を採る
