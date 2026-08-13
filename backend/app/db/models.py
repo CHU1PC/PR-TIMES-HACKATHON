@@ -6,7 +6,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-# ログインを保つ期間。UserSession.expires_at と Cookie の max-age を同じ値から導く
+# expires_at と Cookie の max-age をこの1つから導く
 SESSION_EXPIRY_DAYS = 7
 
 # app/llm/embeddings.py の DIMENSIONS と必ず揃える。ずれると投入時に落ちる
@@ -148,8 +148,7 @@ class GoogleCredential(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", ondelete="CASCADE", unique=True, index=True)
-    # Credentials.to_json() の中身。refresh のたびに書き戻す
-    token_json: str = Field(description="access/refresh token を含む資格情報")
+    token_json: str = Field(description="Credentials.to_json() の中身。refresh のたびに書き戻す")
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, onupdate=lambda: datetime.now(UTC)),
