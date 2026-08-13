@@ -325,7 +325,7 @@ Resources:
         HttpCode: "200"
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
-          Value: "10"
+          Value: "60"
 
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
