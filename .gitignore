@@ -20,8 +20,7 @@ dist/
 # ETL 出力（RDS由来のデータはコミットしない）
 data/
 
-# Google Calendar の認証情報
-credentials.json
+# Google Calendar のトークン（保存先の作り直しは #8）
 google_token.json
 
 # misc
