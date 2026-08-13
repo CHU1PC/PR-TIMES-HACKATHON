@@ -10,25 +10,31 @@ router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
 @router.get("/status")
 async def calendar_status(request: Request, db: DbSessionDep) -> CalendarStatus:
-    """この環境で連携が使えるか, そしてこの人が連携済みかを返す。
+    """ログイン済みか, この環境で連携が使えるか, この人が連携済みかを返す。
 
-    未ログインでも 401 にせず connected=false を返す。連携ボタンを出す判断に使うため。
+    未ログインでも 401 にせず signed_in=false を返す。ログインボタンを出す判断に使うため。
 
     Args:
         request: セッション Cookie を読むために使う。
         db: データベースセッション。
 
     Returns:
-        設定状況と連携状況。
+        ログインと連携の状況。
     """
     configured = bool(settings.GOOGLE_CLIENT_ID)
+    demo = settings.demo_enabled
 
     try:
         user = await get_current_user(request, db)
-    except Exception:  # ruff: ignore[blind-except] — 未ログインも失効も「未連携」として同じに扱う
-        return CalendarStatus(configured=configured, connected=False)
+    except Exception:  # ruff: ignore[blind-except] — 未ログインも失効も同じに扱う
+        return CalendarStatus(signed_in=False, configured=configured, connected=False, demo=demo)
 
-    return CalendarStatus(configured=configured, connected=await service(db, user.id) is not None)
+    return CalendarStatus(
+        signed_in=True,
+        configured=configured,
+        connected=await service(db, user.id) is not None,
+        demo=demo,
+    )
 
 
 @router.post("/events")
@@ -41,11 +47,10 @@ async def calendar_events(query: EventQuery, user: CurrentUser, db: DbSessionDep
         db: データベースセッション。
 
     Returns:
-        連携状態と予定。未連携なら events は空。
+        Google の連携状態と予定。連携していなくても自分で足した予定は返る。
     """
     found = await events(db, user.id, time_min=query.time_min, time_max=query.time_max)
 
-    if found is None:
-        return CalendarEvents(connected=False, events=[])
+    return CalendarEvents(connected=await service(db, user.id) is not None, events=found)
 
     return CalendarEvents(connected=True, events=found)

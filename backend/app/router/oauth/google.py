@@ -11,10 +11,13 @@ from google.oauth2 import id_token as google_id_token
 from google.oauth2.credentials import Credentials
 from loguru import logger
 
+from app.auth.demo import register
 from app.auth.google import REVOKE_ENDPOINT, SCOPES, TOKEN_ENDPOINT, forget_credentials, save_credentials
 from app.auth.identities import upsert_user
 from app.auth.user_sessions import SESSION_COOKIE, SESSION_MAX_AGE, create_session, revoke_session
+from app.calendar import seed_events
 from app.dependencies import CurrentUser, DbSessionDep
+from app.schema.calendar import DemoLogin
 from app.settings import settings
 
 # 経路はフロントとの契約なので /api/calendar のまま置く
@@ -176,6 +179,53 @@ async def oauth_callback(request: Request, code: str, state: str, db: DbSessionD
         samesite="lax",
     )
     response.delete_cookie(STATE_COOKIE, httponly=True, secure=settings.COOKIE_SECURE, samesite="lax")
+    return response
+
+
+@router.post("/demo-login", status_code=status.HTTP_204_NO_CONTENT)
+async def demo_login(body: DemoLogin, request: Request, db: DbSessionDep) -> Response:
+    """Google を通さず名前だけでログインする。初めての名前なら予定を積んで返す。
+
+    Args:
+        body: 表示名。空なら既定の名前を使う。
+        request: user-agent と接続元をセッションに残すために使う。
+        db: データベースセッション。
+
+    Returns:
+        204。セッション Cookie を張る。
+
+    Raises:
+        HTTPException: APP_ENV が demo でないとき。
+    """
+    if not settings.demo_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="デモログインは開いていません",
+        )
+
+    user, created = await register(db, body.name)
+
+    # 作った直後だけ積む。2回目以降は本人が動かした結果をそのまま残す
+    if created:
+        planted = await seed_events(db, user.id)
+        logger.info("デモの予定を積んだ 名前={} 件数={}", user.name, planted)
+
+    token = await create_session(
+        db,
+        user.id,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=token,
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+    )
     return response
 
 

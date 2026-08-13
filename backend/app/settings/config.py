@@ -38,6 +38,20 @@ class Settings(BaseSettings):
         description="Cookie に Secure を付ける. HTTP のローカル開発でだけ false にする",
     )
 
+    APP_ENV: str = Field(
+        default="production",
+        description='"demo" のときだけ Google なしのデモログインを開く. 既定は塞いだまま',
+    )
+
+    @property
+    def demo_enabled(self) -> bool:
+        """デモログインを開いてよいか。
+
+        Returns:
+            APP_ENV が demo のとき True。
+        """
+        return self.APP_ENV == "demo"
+
     @model_validator(mode="after")
     def _forbid_wildcard_origin(self) -> "Settings":
         """Cookie を送るので許可先を絞る。

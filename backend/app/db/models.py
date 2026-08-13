@@ -141,6 +141,31 @@ class UserSession(SQLModel, table=True):
     ip_address: str | None = Field(default=None, max_length=45)
 
 
+class Event(SQLModel, table=True):
+    """このアプリが持つ予定。Google から読むぶんとは別に, 自分で足したものを入れる。"""
+
+    __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    title: str = Field(max_length=255, description="予定の件名")
+    description: str = Field(default="", description="予定の詳細。無ければ空文字")
+    location: str = Field(default="", max_length=255, description="場所。無ければ空文字")
+    starts_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
+        description="開始日時",
+    )
+    ends_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+        description="終了日時",
+    )
+    all_day: bool = Field(default=False, description="終日の予定か。真なら画面には日付だけ出す")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
 class GoogleCredential(SQLModel, table=True):
     """Google が発行したカレンダー用のトークン。1ユーザーに1つ。"""
 
