@@ -15,12 +15,12 @@ class CalendarEvent(BaseModel):
 
     id: str = Field(description="Google 側の予定ID")
     title: str = Field(description="予定の件名。無題なら (タイトルなし)")
-    description: str = Field(default="", description="予定の詳細")
-    location: str = Field(default="", description="場所")
+    description: str = Field(description="予定の詳細。無ければ空文字")
+    location: str = Field(description="場所。無ければ空文字")
     start: str = Field(description="開始。終日予定は日付だけになる")
     end: str = Field(description="終了。終日予定は日付だけになる")
-    html_link: str | None = Field(default=None, alias="htmlLink", description="Google カレンダーで開く URL")
-    status: str | None = Field(default=None, description="confirmed / tentative / cancelled")
+    html_link: str | None = Field(alias="htmlLink", description="Google カレンダーで開く URL")
+    status: str | None = Field(description="confirmed / tentative / cancelled")
 
 
 class CalendarStatus(BaseModel):
@@ -34,4 +34,4 @@ class CalendarEvents(BaseModel):
     """指定期間の予定。"""
 
     connected: bool = Field(description="Google と連携済みか")
-    events: list[CalendarEvent] = Field(default_factory=list[CalendarEvent], description="期間内の予定")
+    events: list[CalendarEvent] = Field(description="期間内の予定")
