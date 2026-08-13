@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, status
 
-from app.calendar import events, service
+from app.calendar import create_event, events, service
 from app.dependencies import CurrentUser, DbSessionDep, get_current_user
-from app.schema.calendar import CalendarEvents, CalendarStatus, EventQuery
+from app.schema.calendar import CalendarEvent, CalendarEvents, CalendarStatus, EventCreate, EventQuery
 from app.settings import settings
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
@@ -53,4 +53,17 @@ async def calendar_events(query: EventQuery, user: CurrentUser, db: DbSessionDep
 
     return CalendarEvents(connected=await service(db, user.id) is not None, events=found)
 
-    return CalendarEvents(connected=True, events=found)
+
+@router.post("/plans", status_code=status.HTTP_201_CREATED)
+async def add_plan(payload: EventCreate, user: CurrentUser, db: DbSessionDep) -> CalendarEvent:
+    """このアプリに予定を1件足す。Google 側には書き込まない。
+
+    Args:
+        payload: 画面から来た内容。
+        user: セッションから復元したユーザー。
+        db: データベースセッション。
+
+    Returns:
+        保存した予定。
+    """
+    return await create_event(db, user.id, payload)
