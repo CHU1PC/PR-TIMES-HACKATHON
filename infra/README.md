@@ -144,7 +144,9 @@ aws ec2 describe-subnets --profile prtimes --region ap-northeast-1 \
 `main` に push すると [deploy.yml](../.github/workflows/deploy.yml) が動く。
 手で回すなら Actions タブ → deploy → Run workflow。URL は実行サマリに出る。
 
-**migration は自動で走らない。** モデルを変えたら、デプロイの前に手元から当てる。
+**migration は CI が当てる。** サービスを入れ替える前に、本番と同じイメージを ECS の
+使い捨てタスクとして VPC の中で起こして `alembic upgrade head` を流す。落ちたらそこで止まる。
+コーパスの投入（`etl.load_corpus`）は自動では走らない。
 
 ## 止めるとき
 

@@ -54,8 +54,9 @@ docker compose up --build
 | 2 | イメージをビルドして ECR へ push（タグは git sha の先頭12桁） |
 | 3 | `ecr` スタックを作る（無ければ） |
 | 4 | `app` スタックを流す。イメージのタグが変わるのでタスク定義が新しくなりサービスが入れ替わる |
-| 5 | フロントをビルドして S3 へ同期、CloudFront のキャッシュを飛ばす |
-| 6 | `/api/health` が返るまで最大150秒待つ |
+| 5 | `alembic upgrade head` を ECS の使い捨てタスクで流す。落ちたらここで止まる |
+| 6 | フロントをビルドして S3 へ同期、CloudFront のキャッシュを飛ばす |
+| 7 | `/api/health` が返るまで最大150秒待つ |
 
 URL は Actions の実行サマリに出る。
 
@@ -63,18 +64,22 @@ URL は Actions の実行サマリに出る。
 
 ## migration
 
-**自動では走らない。** 手元からトンネル越しに当てる。
+デプロイのたびに CI が当てる。RDS は VPC の外から届かないので、本番と同じイメージを
+ECS の使い捨てタスク（`prtimes-hackathon-2026summer-migrate`）として VPC の中で起こし、
+`alembic upgrade head` を流す。終了コードが 0 でなければサービスは入れ替えずに止まる。
+ログは `/ecs/prtimes-hackathon-2026summer-backend` の `migrate/` ストリームに出る。
+
+モデルを変えたら migration を作って一緒にコミットする。
 
 ```bash
-cd backend && uv run alembic upgrade head
+cd backend && uv run alembic revision --autogenerate -m "add users and sessions"
 ```
 
-列の削除を含む migration が本番で自動実行されると戻せないため、意図的に手動にしてある。
-モデルを変えたら migration を作り、**デプロイの前に**当てる。
+**列の削除・改名は同じデプロイに混ぜない。** マイグレーションはサービスの入れ替えより
+先に終わるので、旧コードが数十秒だけ新しいスキーマの上で動く。追加だけに保てばここは無害だが、
+消す変更は「新コードが参照をやめる」→ デプロイ → 「列を消す」の2回に分ける。
 
-```bash
-uv run alembic revision --autogenerate -m "add users and sessions"
-```
+手元から当てる場合は踏み台越しにトンネルを張る（[infra/README.md](../infra/README.md)）。
 
 ## 止める
 
