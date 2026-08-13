@@ -38,7 +38,7 @@ WC_SQL = """
     GROUP BY company_id, release_id
 """
 
-# body 本文は転送せず長さだけサーバ側で計算する（requirements §8.5）
+# body 本文は転送せず長さだけサーバ側で計算する(requirements §8.5)
 RELEASE_SQL = """
     SELECT company_id, release_id, release_type_id, created_at, title,
            length(body) AS body_len,
@@ -115,8 +115,8 @@ async def wc_chunk(lo: int, hi: int, sem: asyncio.Semaphore) -> None:
     """1レンジ分の転載を集約する。タイムアウトしたら半分に割って再帰する。
 
     Args:
-        lo: company_id の下限（含む）。
-        hi: company_id の上限（含まない）。
+        lo: company_id の下限(含む)。
+        hi: company_id の上限(含まない)。
         sem: 同時実行数を絞るセマフォ。再帰前に必ず解放される。
     """
     path = OUT / f"wc_{lo:07d}_{hi:07d}.csv.gz"

@@ -2,7 +2,7 @@ from typing import Final
 
 from app.schema import SlotCode
 
-# 埋める順。place を先頭, video を末尾にする根拠は実測（docs/findings.md §4）。残りは答えやすい順
+# 埋める順。place を先頭, video を末尾にする根拠は実測(docs/findings.md §4)。残りは答えやすい順
 SLOT_ORDER: Final[tuple[SlotCode, ...]] = ("place", "partner", "people", "novelty", "observation", "video")
 
 QUESTIONS: Final[dict[SlotCode, str]] = {
@@ -33,10 +33,10 @@ EFFECTS: Final[dict[SlotCode, str]] = {
     "video": "動画があれば添えられます。無ければ撮らなくて構いません。",
 }
 
-# 判定クエリC を通り, 因果を書いてよいスロット。通らなかったものは機能説明に留める（§6.5）
+# 判定クエリC を通り, 因果を書いてよいスロット。通らなかったものは機能説明に留める(§6.5)
 CAUSAL_SLOTS: Final[frozenset[SlotCode]] = frozenset({"place"})
 
-# 読み取れなかったとき1回だけ聞き直す。place だけなのは効果量が突出しているため（同 §4）
+# 読み取れなかったとき1回だけ聞き直す。place だけなのは効果量が突出しているため(同 §4)
 RETRY_SLOTS: Final[frozenset[SlotCode]] = frozenset({"place"})
 
 FOLLOW_UPS: Final[dict[SlotCode, str]] = {

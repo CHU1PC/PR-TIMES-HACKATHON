@@ -15,7 +15,7 @@ class DraftSuggestion(BaseModel):
 
     action: str = Field(description="この予定に足すこと。20〜60字。命令形にせず提案の形で書く")
     reason: str = Field(description="事例のどこから言えるのか。事例に書かれていたことだけを根拠にする")
-    # release_id は企業をまたいで重複する（実測3,352個）ので, 事例の指し先には使えない
+    # release_id は企業をまたいで重複する(実測3,352個)ので, 事例の指し先には使えない
     cited: list[int] = Field(
         default_factory=list[int],
         description="根拠にした事例の番号。渡した #1〜#8 の数字。1件以上必ず入れる",

@@ -40,7 +40,7 @@ task=$(aws ecs run-task \
   --query 'tasks[0].taskArn' --output text)
 
 if [ -z "$task" ] || [ "$task" = "None" ]; then
-  echo "::error::マイグレーションタスクを起動できなかった（配置失敗）"
+  echo "::error::マイグレーションタスクを起動できなかった(配置失敗)"
   exit 1
 fi
 aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task"

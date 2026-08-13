@@ -39,7 +39,7 @@ def is_done(draft: PlanDraft, code: SlotCode) -> bool:
 
 
 def next_slot(draft: PlanDraft) -> SlotCode | None:
-    """次に聞くスロットを返す。順序は実測に基づき固定（slots.py 参照）。
+    """次に聞くスロットを返す。順序は実測に基づき固定(slots.py 参照)。
 
     Args:
         draft: 現在のイベント内容。

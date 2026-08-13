@@ -17,7 +17,7 @@ node_modules/
 dist/
 .vite/
 
-# ETL 出力（RDS由来のデータはコミットしない）
+# ETL 出力(RDS由来のデータはコミットしない)
 data/
 
 # misc
@@ -27,5 +27,5 @@ data/
 .DS_Store
 *.log
 
-# 計画メモ（ツールのスクラッチ）
+# 計画メモ(ツールのスクラッチ)
 .hermes/

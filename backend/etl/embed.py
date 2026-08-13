@@ -12,7 +12,7 @@ from app.settings import DATA_DIR, settings
 CORPUS = DATA_DIR / "corpus.parquet"
 OUT = DATA_DIR / "corpus_vec.npy"
 
-# バッチ単位で書き出す。1バッチの失敗で全件を捨てないための中間置き場（実測: 5分ぶんを失った）
+# バッチ単位で書き出す。1バッチの失敗で全件を捨てないための中間置き場(実測: 5分ぶんを失った)
 SHARDS = DATA_DIR / "embed_shards"
 
 # 次元とモデルは app/llm/embeddings.py と揃える。ずれると検索側と噛み合わない
@@ -90,7 +90,7 @@ async def embed_all(texts: list[str]) -> np.ndarray:
     SHARDS.mkdir(parents=True, exist_ok=True)
     offsets = list(range(0, len(texts), BATCH))
     todo = [i for i in offsets if not (SHARDS / f"{i:07d}.npy").exists()]
-    logger.info("バッチ {}/{} 本を実行（残りは前回の続き）", len(todo), len(offsets))
+    logger.info("バッチ {}/{} 本を実行(残りは前回の続き)", len(todo), len(offsets))
 
     sem = asyncio.Semaphore(CONCURRENCY)
     done = 0

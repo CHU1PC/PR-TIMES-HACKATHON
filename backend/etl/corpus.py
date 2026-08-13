@@ -21,7 +21,7 @@ SINCE = "2023-01-01"
 # 全国メディアが強い業種だけでコーパスが埋まるのを防ぐため, 層ごとに同数を割り当てる
 PER_STRATUM = 25
 
-# release_location は1リリースに複数行入る（実測 236,017 件）。市区町村がある行を優先して1行に畳む
+# release_location は1リリースに複数行入る(実測 236,017 件)。市区町村がある行を優先して1行に畳む
 PRIMARY_LOCATION = """
     SELECT company_id, release_id, prefecture_id, city_id
     FROM release_location
@@ -37,7 +37,7 @@ PRIMARY_CATEGORY = """
     QUALIFY row_number() OVER (PARTITION BY company_id, release_id ORDER BY business_category_id) = 1
 """
 
-# reach は PR TIMES 自身を除いたユニーク媒体数（wc_uniq_ex）。requirements §8.3 の目的変数
+# reach は PR TIMES 自身を除いたユニーク媒体数(wc_uniq_ex)。requirements §8.3 の目的変数
 SELECT_CORPUS = f"""
 WITH loc AS ({PRIMARY_LOCATION}),
      cat AS ({PRIMARY_CATEGORY}),

@@ -1,6 +1,6 @@
 # インフラ情報
 
-秘密情報は含めない。パスワードとキーは Parameter Store と `.env`（git 管理外）に置く。
+秘密情報は含めない。パスワードとキーは Parameter Store と `.env`(git 管理外)に置く。
 作成手順は [infra/README.md](../infra/README.md)、構成図は [architecture.drawio](architecture.drawio)。
 
 ## AWS
@@ -9,10 +9,10 @@
 | --- | --- |
 | アカウント | 622952748235 (`hackathon-2026-summer-team1`) |
 | リージョン | ap-northeast-1 |
-| デプロイ用 IAM ユーザー | `prtimes-hackathon-deployer`（管理ポリシー `prtimes-hackathon-deploy` を直接アタッチ） |
-| CI が引くロール | `prtimes-hackathon-github-actions`（OIDC。`refs/heads/main` のみ） |
+| デプロイ用 IAM ユーザー | `prtimes-hackathon-deployer`(管理ポリシー `prtimes-hackathon-deploy` を直接アタッチ) |
+| CI が引くロール | `prtimes-hackathon-github-actions`(OIDC。`refs/heads/main` のみ) |
 
-## 主催者から与えられたもの（触らない）
+## 主催者から与えられたもの(触らない)
 
 | 種別 | 識別子 | 備考 |
 | --- | --- | --- |
@@ -31,9 +31,9 @@ RDS は `PubliclyAccessible: false`。手元から見るには EC2 を踏み台�
 | スタック | 主なリソース |
 | --- | --- |
 | `prtimes-hackathon-oidc` | GitHub Actions 用の IAM ロールと OIDC プロバイダ |
-| `prtimes-hackathon-ecr` | バックエンドのイメージ置き場（5世代保持） |
+| `prtimes-hackathon-ecr` | バックエンドのイメージ置き場(5世代保持) |
 | `prtimes-hackathon-db` | アプリ用 RDS `prtimes-hackathon-2026summer-app` / SG `sg-0f770364a7919eb30` |
-| `prtimes-hackathon-app` | S3 / CloudFront / ALB / ECS Fargate / ログ / ロール / **パブリックサブネット 1c**（10.0.1.0/24・自前のルートテーブルで既存 IGW へ） |
+| `prtimes-hackathon-app` | S3 / CloudFront / ALB / ECS Fargate / ログ / ロール / **パブリックサブネット 1c**(10.0.1.0/24・自前のルートテーブルで既存 IGW へ) |
 
 アプリ用 RDS は PostgreSQL 17.9 + pgvector 0.8.1、`db.t4g.small`、DB 名 `app`。
 バックアップ1世代、`DeletionPolicy: Snapshot`。RAG のコーパス 12.9万件と転載ログ 539万行が入っている。
@@ -45,13 +45,13 @@ ALB は AZ 違いのサブネットが2枚必要だが、既存は 1a に1枚し
 
 | ポート | 用途 |
 | --- | --- |
-| 22 | EC2 への SSH（踏み台） |
+| 22 | EC2 への SSH(踏み台) |
 | 80 | EC2 の pgAdmin。**潰さない** |
-| 8000 | バックエンド（ローカルもコンテナも同じ） |
+| 8000 | バックエンド(ローカルもコンテナも同じ) |
 | 5173 | フロントの dev server |
 | 5432 | RDS |
 
-## セキュリティグループ（矢印1本 = inbound 1本）
+## セキュリティグループ(矢印1本 = inbound 1本)
 
 | 対象 | 許可する inbound |
 | --- | --- |
@@ -69,8 +69,8 @@ NAT Gateway は置かない。タスクをパブリックサブネットに置�
 
 | パラメータ | 使う人 |
 | --- | --- |
-| `/prtimes-hackathon/openai-api-key` | ECS タスク（環境変数 `OPENAI_API_KEY`） |
-| `/prtimes-hackathon/database-url` | ECS タスク（環境変数 `DATABASE_URL`） |
+| `/prtimes-hackathon/openai-api-key` | ECS タスク(環境変数 `OPENAI_API_KEY`) |
+| `/prtimes-hackathon/database-url` | ECS タスク(環境変数 `DATABASE_URL`) |
 | `/prtimes-hackathon/db-password` | CloudFormation のスタック更新時 |
 
 ## 手元から RDS を見る
@@ -90,7 +90,7 @@ DATABASE_URL="postgresql://prtimes:$(aws ssm get-parameter --profile prtimes \
 
 ## EC2 のセキュリティグループ
 
-会場外から作業するため自宅 IP を追加してある。**IP が変わったら登録し直す**（`curl -4 -s ifconfig.me`）。
+会場外から作業するため自宅 IP を追加してある。**IP が変わったら登録し直す**(`curl -4 -s ifconfig.me`)。
 
 ```bash
 aws ec2 authorize-security-group-ingress --region ap-northeast-1 --profile prtimes \
@@ -101,7 +101,7 @@ aws ec2 authorize-security-group-ingress --region ap-northeast-1 --profile prtim
 
 ## 終了時のクリーンアップ
 
-- [ ] `DesiredCount=0` でタスクを止める（[infra/README.md](../infra/README.md) の「止めるとき」）
+- [ ] `DesiredCount=0` でタスクを止める([infra/README.md](../infra/README.md) の「止めるとき」)
 - [ ] EC2 の SG から自宅 IP のルールを削除
-- [ ] スタックを app → db → ecr → oidc の順で削除（S3 は中身を空にしてから）
+- [ ] スタックを app → db → ecr → oidc の順で削除(S3 は中身を空にしてから)
 - [ ] `prtimes-hackathon-deployer` のアクセスキーを削除

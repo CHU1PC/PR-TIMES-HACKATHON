@@ -283,13 +283,13 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   # ===========================================================================
-  # ネットワーク: セキュリティグループ（矢印1本 = inbound 1本）
+  # ネットワーク: セキュリティグループ(矢印1本 = inbound 1本)
   # ===========================================================================
 
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      # CloudFront からだけ ALB に入れる（AWS は説明文に ASCII しか許さない）
+      # CloudFront からだけ ALB に入れる(AWS は説明文に ASCII しか許さない)
       GroupDescription: Allow ALB inbound from CloudFront only
       VpcId: !Ref VpcId
       SecurityGroupIngress:
