@@ -3,9 +3,12 @@ import type {
   Exchange,
   HearingResponse,
   PlanDraft,
+  ProposalCase,
+  ProposalResponse,
   SlotCode,
   SlotState,
   SparringResponse,
+  Suggestion,
 } from "@/types";
 
 const SLOT_CODES = new Set<string>(["place", "partner", "people", "novelty", "observation", "video"]);
@@ -89,6 +92,45 @@ export function isSparringResponse(value: unknown): value is SparringResponse {
     value.slots.every(isSlotState) &&
     typeof value.ready === "boolean"
   );
+}
+
+export function isProposalCase(value: unknown): value is ProposalCase {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.company_id === "number" &&
+    typeof value.release_id === "number" &&
+    typeof value.title === "string" &&
+    typeof value.subtitle === "string" &&
+    typeof value.body_head === "string" &&
+    isTextOrNull(value.company_name) &&
+    isTextOrNull(value.business_category) &&
+    isTextOrNull(value.release_type) &&
+    isTextOrNull(value.prefecture) &&
+    isTextOrNull(value.city) &&
+    typeof value.published_on === "string" &&
+    isTextArray(value.media)
+  );
+}
+
+export function isSuggestion(value: unknown): value is Suggestion {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.action === "string" &&
+    typeof value.reason === "string" &&
+    Array.isArray(value.cited) &&
+    value.cited.every((item) => typeof item === "number")
+  );
+}
+
+/** 同上。提案側。cited が cases の範囲に収まっているかまで見る。 */
+export function isProposalResponse(value: unknown): value is ProposalResponse {
+  if (!isRecord(value)) return false;
+  if (!Array.isArray(value.cases) || !value.cases.every(isProposalCase)) return false;
+  if (!Array.isArray(value.suggestions) || !value.suggestions.every(isSuggestion)) return false;
+  if (!isTextArray(value.media)) return false;
+  // 範囲外の添字が来ると cases[i] が undefined になり, 描画時に落ちる
+  const total = value.cases.length;
+  return value.suggestions.every((s) => s.cited.every((i) => Number.isInteger(i) && i >= 0 && i < total));
 }
 
 /** 同上。ヒアリング側。 */

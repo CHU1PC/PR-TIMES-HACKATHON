@@ -148,6 +148,9 @@ export function SparringPage() {
                 </div>
               ))}
             </dl>
+            <button type="button" className="button button--wide" onClick={() => navigate("/proposal")}>
+              似た事例から, 足せることを見る
+            </button>
             <p className="ready__note">
               <Link to="/" className="entry__link">
                 別の予定を入れる

@@ -114,3 +114,47 @@ export interface HearingResponse {
   /** 聞き終わったか */
   done: boolean;
 }
+
+/** 提案の根拠にした過去のリリース1件。転載件数はサーバーが応答に載せない */
+export interface ProposalCase {
+  /** PR TIMES 側の企業ID */
+  company_id: number;
+  /** 企業内でのリリースID。企業をまたぐと重複するので単独では使わない */
+  release_id: number;
+  title: string;
+  subtitle: string;
+  /** 本文冒頭をHTML除去して1000文字 */
+  body_head: string;
+  company_name: string | null;
+  business_category: string | null;
+  release_type: string | null;
+  prefecture: string | null;
+  city: string | null;
+  /** 配信日 YYYY-MM-DD */
+  published_on: string;
+  /** この事例を拾った媒体のうち特徴的なもの */
+  media: string[];
+}
+
+export interface Suggestion {
+  /** この取り組みに足せること */
+  action: string;
+  /** 事例のどこから言えるのか */
+  reason: string;
+  /** 根拠にした事例。cases 配列の0始まりの添字 */
+  cited: number[];
+}
+
+export interface ProposalResponse {
+  /** 足せること */
+  suggestions: Suggestion[];
+  /** 根拠にした事例 */
+  cases: ProposalCase[];
+  /** 事例群を拾っていた媒体のうち特徴的なもの */
+  media: string[];
+}
+
+export interface ProposalRequest {
+  /** 壁打ちで埋めたイベント内容 */
+  draft: PlanDraft;
+}
