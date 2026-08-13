@@ -67,7 +67,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # === バックエンドのイメージ ===
       - name: ECR スタックを作る（無ければ）
         run: |
           aws cloudformation deploy \
@@ -83,12 +82,10 @@ jobs:
           repo=$(aws cloudformation describe-stacks --stack-name "$ECR_STACK" \
             --query 'Stacks[0].Outputs[?OutputKey==`RepositoryUri`].OutputValue' --output text)
           uri="$repo:${GITHUB_SHA::12}"
-          # タスク定義が X86_64 なので, ランナーと同じ amd64 を明示して積む
           docker build --platform linux/amd64 -t "$uri" backend/
           docker push "$uri"
           echo "uri=$uri" >> "$GITHUB_OUTPUT"
 
-      # === インフラ ===
       # CLOUDFRONT スコープの WebACL は us-east-1 にしか作れない
       - name: WAF スタックを流す（us-east-1）
         run: |
@@ -102,15 +99,12 @@ jobs:
         env:
           VPC_ID: ${{ secrets.VPC_ID }}
         run: |
-          # CloudFront のエッジ IP レンジ. リージョンごとに ID が違うので名前で引く
           pl=$(aws ec2 describe-managed-prefix-lists \
             --filters Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing \
             --query 'PrefixLists[0].PrefixListId' --output text)
-          # 新設するパブリックサブネットの既定経路を向ける先
           igw=$(aws ec2 describe-internet-gateways \
             --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
             --query 'InternetGateways[0].InternetGatewayId' --output text)
-          # コーパス DB の SG。app スタックはここへ「タスクから :5432」を1本足す
           dbsg=$(aws cloudformation describe-stacks --stack-name "$DB_STACK" \
             --query 'Stacks[0].Outputs[?OutputKey==`SecurityGroupId`].OutputValue' --output text)
           exec_role=$(aws cloudformation describe-stacks --stack-name "$ROLES_STACK" \
@@ -119,7 +113,6 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`TaskRoleArn`].OutputValue' --output text)
           acl=$(aws cloudformation describe-stacks --region us-east-1 --stack-name "$WAF_STACK" \
             --query 'Stacks[0].Outputs[?OutputKey==`WebAclArn`].OutputValue' --output text)
-          # ログに出さない。CloudFront が付ける秘密のヘッダ
           verify=$(aws ssm get-parameter --name /prtimes-hackathon/origin-verify \
             --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$verify"
@@ -175,7 +168,6 @@ jobs:
                 esac
               done >> "$GITHUB_OUTPUT"
 
-      # === フロント ===
       - uses: oven-sh/setup-bun@v2
 
       - name: フロントをビルド
@@ -189,7 +181,6 @@ jobs:
         env:
           BUCKET: ${{ steps.stack.outputs.bucket }}
         run: |
-          # ハッシュが付くのは assets/ だけ。public/ に immutable を付けると差し替えられない
           aws s3 sync frontend/dist "s3://$BUCKET" --delete \
             --cache-control 'public,max-age=300'
           aws s3 sync frontend/dist/assets "s3://$BUCKET/assets" \
@@ -203,12 +194,10 @@ jobs:
             --distribution-id '${{ steps.stack.outputs.distribution }}' \
             --paths '/*' >/dev/null
 
-      # === 確認 ===
       - name: 疎通を確かめる
         env:
           APP_URL: ${{ steps.stack.outputs.app_url }}
         run: |
-          # CloudFront の初回作成直後はエッジへの伝搬に数分かかる
           for i in $(seq 1 24); do
             if curl -fsS --max-time 10 "$APP_URL/api/health"; then
               echo
