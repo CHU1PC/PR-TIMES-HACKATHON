@@ -21,6 +21,12 @@ const navigationItems: NavigationItem[] = [
     isActive: (path) => path === "/" || path === "",
   },
   {
+    label: "新しいPRネタを作る",
+    path: "/entry",
+    icon: "sparkles",
+    isActive: (path) => path === "/entry",
+  },
+  {
     label: "予定を探す",
     path: "/hearing",
     icon: "search",

@@ -9,7 +9,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ currentPath }: AppHeaderProps) {
-  const isEntry = currentPath === "/entry";
+  const isHome = currentPath === "/" || currentPath === "";
   const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [checked, setChecked] = useState(false);
   const [name, setName] = useState("");
@@ -127,15 +127,15 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
           </button>
         ) : null}
 
-        {isEntry ? (
+        {isHome ? (
+          <Link to="/day" className="app-header__action">
+            <Icon name="plus" size={19} />
+            <span>新しいイベントをカレンダーに追加する</span>
+          </Link>
+        ) : (
           <Link to="/" className="app-header__action app-header__action--secondary">
             <Icon name="arrow-left" size={19} />
             <span>ホームへ戻る</span>
-          </Link>
-        ) : (
-          <Link to="/entry" className="app-header__action">
-            <Icon name="plus" size={19} />
-            <span>新しいPRネタを作る</span>
           </Link>
         )}
       </div>

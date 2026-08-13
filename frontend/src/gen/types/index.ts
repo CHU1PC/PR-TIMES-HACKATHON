@@ -1,3 +1,4 @@
+export type { AddPlanApiCalendarPlansPost201, AddPlanApiCalendarPlansPost422, AddPlanApiCalendarPlansPostMutation, AddPlanApiCalendarPlansPostMutationRequest, AddPlanApiCalendarPlansPostMutationResponse } from "./AddPlanApiCalendarPlansPost.ts";
 export type { CalendarEvent } from "./CalendarEvent.ts";
 export type { CalendarEvents } from "./CalendarEvents.ts";
 export type { CalendarEventsApiCalendarEventsPost200, CalendarEventsApiCalendarEventsPost422, CalendarEventsApiCalendarEventsPostMutation, CalendarEventsApiCalendarEventsPostMutationRequest, CalendarEventsApiCalendarEventsPostMutationResponse } from "./CalendarEventsApiCalendarEventsPost.ts";
@@ -7,6 +8,7 @@ export type { Candidate, CandidateCategoryEnumKey } from "./Candidate.ts";
 export type { DemoLogin } from "./DemoLogin.ts";
 export type { DemoLoginApiCalendarDemoLoginPost204, DemoLoginApiCalendarDemoLoginPost422, DemoLoginApiCalendarDemoLoginPostMutation, DemoLoginApiCalendarDemoLoginPostMutationRequest, DemoLoginApiCalendarDemoLoginPostMutationResponse } from "./DemoLoginApiCalendarDemoLoginPost.ts";
 export type { DisconnectApiCalendarConnectionDelete204, DisconnectApiCalendarConnectionDeleteMutation, DisconnectApiCalendarConnectionDeleteMutationResponse } from "./DisconnectApiCalendarConnectionDelete.ts";
+export type { EventCreate } from "./EventCreate.ts";
 export type { EventQuery } from "./EventQuery.ts";
 export type { Exchange } from "./Exchange.ts";
 export type { HTTPValidationError } from "./HTTPValidationError.ts";

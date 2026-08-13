@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
+import { DayPage } from "@/pages/DayPage";
 import { EntryPage } from "@/pages/EntryPage";
 import { HearingPage } from "@/pages/HearingPage";
 import { ProposalPage } from "@/pages/ProposalPage";
@@ -26,6 +27,7 @@ export default function App() {
 
   let page: ReactNode = <NotFound />;
   if (path === "/" || path === "") page = <HomePage />;
+  else if (path === "/day") page = <DayPage key={search} />;
   else if (path === "/entry") page = <EntryPage key={search} />;
   else if (path === "/sparring") page = <SparringPage />;
   else if (path === "/hearing") page = <HearingPage />;
