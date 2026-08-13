@@ -1,9 +1,13 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column
+from sqlalchemy import Column, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
+
+# ログインを保つ期間。UserSession.expires_at と Cookie の max-age を同じ値から導く
+SESSION_EXPIRY_DAYS = 7
 
 # app/llm/embeddings.py の DIMENSIONS と必ず揃える。ずれると投入時に落ちる
 EMBEDDING_DIMENSIONS = 256
@@ -79,3 +83,74 @@ class Category(SQLModel, table=True):
 
     business_category_id: int = Field(primary_key=True)
     business_category_name: str
+
+
+class User(SQLModel, table=True):
+    """カレンダーを連携した人。壁打ちと提案は匿名のままなので, ここに入るのは連携した人だけ。"""
+
+    __tablename__ = "users"  # pyright: ignore[reportAssignmentType]
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    email: str | None = Field(default=None, max_length=320, description="Google から得たメールアドレス")
+    name: str = Field(default="", max_length=255, description="Google から得た表示名")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class OAuthIdentity(SQLModel, table=True):
+    """外部 IdP のアカウント。provider と subject の組で1人を指す。"""
+
+    __tablename__ = "oauth_identities"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("provider", "subject", name="uq_provider_subject"),)
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    provider: str = Field(max_length=50, description="google など")
+    subject: str = Field(max_length=255, description="プロバイダ内での一意なID")
+    email: str | None = Field(default=None, max_length=320)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class UserSession(SQLModel, table=True):
+    """ログインを保つためのセッション。生のトークンは保存せずハッシュだけ持つ。"""
+
+    __tablename__ = "user_sessions"  # pyright: ignore[reportAssignmentType]
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    token_hash: str = Field(max_length=64, unique=True, description="Cookie の値の SHA-256")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    expires_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC) + timedelta(days=SESSION_EXPIRY_DAYS),
+        sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
+    )
+    revoked_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        description="連携を切ったら入る。アクティブなら null",
+    )
+    user_agent: str | None = Field(default=None, max_length=512)
+    ip_address: str | None = Field(default=None, max_length=45)
+
+
+class GoogleCredential(SQLModel, table=True):
+    """Google が発行したカレンダー用のトークン。1ユーザーに1つ。"""
+
+    __tablename__ = "google_credentials"  # pyright: ignore[reportAssignmentType]
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", ondelete="CASCADE", unique=True, index=True)
+    # Credentials.to_json() の中身。refresh のたびに書き戻す
+    token_json: str = Field(description="access/refresh token を含む資格情報")
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False, onupdate=lambda: datetime.now(UTC)),
+    )
