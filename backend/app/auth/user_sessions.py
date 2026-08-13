@@ -4,7 +4,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Final
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from app.db.models import SESSION_EXPIRY_DAYS, UserSession
 
@@ -56,3 +58,19 @@ async def create_session(
     )
     await db.commit()
     return token
+
+
+async def revoke_session(db: AsyncSession, token: str) -> None:
+    """セッションを失効させる。行は監査のため残す。
+
+    Args:
+        db: データベースセッション。
+        token: Cookie に入っていた生のトークン。
+    """
+    found = (
+        await db.execute(select(UserSession).where(col(UserSession.token_hash) == hash_session_token(token)))
+    ).scalar_one_or_none()
+
+    if found is not None and found.revoked_at is None:
+        found.revoked_at = datetime.now(UTC)
+        await db.commit()
