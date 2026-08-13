@@ -51,12 +51,17 @@ docker compose up --build
 | # | 内容 |
 | --- | --- |
 | 1 | ruff / pytest / `tsc --noEmit` |
-| 2 | イメージをビルドして ECR へ push（タグは git sha の先頭12桁） |
-| 3 | `ecr` スタックを作る（無ければ） |
-| 4 | `app` スタックを流す。イメージのタグが変わるのでタスク定義が新しくなりサービスが入れ替わる |
-| 5 | `alembic upgrade head` を ECS の使い捨てタスクで流す。落ちたらここで止まる |
-| 6 | フロントをビルドして S3 へ同期、CloudFront のキャッシュを飛ばす |
-| 7 | `/api/health` が返るまで最大150秒待つ |
+| 2 | `ecr` スタックを作る（無ければ） |
+| 3 | イメージをビルドして ECR へ push（タグは git sha の先頭12桁） |
+| 4 | `waf` スタックを流す（us-east-1） |
+| 5 | **`alembic upgrade head` を ECS の使い捨てタスクで流す。落ちたらここで止まる** |
+| 6 | `app` スタックを流す。イメージのタグが変わるのでタスク定義が新しくなりサービスが入れ替わる |
+| 7 | フロントをビルドして S3 へ同期、CloudFront のキャッシュを飛ばす |
+| 8 | `/api/health` が返るまで最大150秒待つ |
+
+**5 が 6 より前なのは意図的。** 逆にすると新しいコードが旧スキーマの上で動き出してから
+migration が走るので、そこで落ちると「新コード + 旧スキーマ」で取り残される。
+この順なら migration の失敗はデプロイの中断で済み、本番は旧コード旧スキーマのまま生き残る。
 
 URL は Actions の実行サマリに出る。
 
@@ -75,11 +80,51 @@ ECS の使い捨てタスク（`prtimes-hackathon-2026summer-migrate`）とし�
 cd backend && uv run alembic revision --autogenerate -m "add users and sessions"
 ```
 
-**列の削除・改名は同じデプロイに混ぜない。** マイグレーションはサービスの入れ替えより
-先に終わるので、旧コードが数十秒だけ新しいスキーマの上で動く。追加だけに保てばここは無害だが、
+**列の削除・改名は同じデプロイに混ぜない。** migration はサービスの入れ替えより先に終わるので、
+旧コードが数十秒だけ新しいスキーマの上で動く。追加だけに保てばここは無害だが、
 消す変更は「新コードが参照をやめる」→ デプロイ → 「列を消す」の2回に分ける。
 
-手元から当てる場合は踏み台越しにトンネルを張る（[infra/README.md](../infra/README.md)）。
+### 本番のコピーに当てて確かめる
+
+順番を直したので migration の失敗で本番が壊れることはないが、**失敗すること自体は防げない。**
+空の DB では通る DDL が、本番の 129,045 行では落ちる（NOT NULL の追加、ユニーク制約違反、型変換）。
+追加以外の migration を書いたら、merge の前にスナップショットから起こしたコピーで試す。
+**本番インスタンスは読まないので、稼働中のサービスには影響しない。**
+
+```bash
+snap=$(aws rds describe-db-snapshots --db-instance-identifier prtimes-hackathon-2026summer-app \
+  --query 'reverse(sort_by(DBSnapshots,&SnapshotCreateTime))[0].DBSnapshotIdentifier' --output text)
+
+aws rds restore-db-instance-from-db-snapshot \
+  --db-instance-identifier prtimes-hackathon-2026summer-migcheck \
+  --db-snapshot-identifier "$snap" \
+  --db-instance-class db.t4g.small \
+  --db-subnet-group-name prtimes-hackathon-2026summer-app \
+  --vpc-security-group-ids "$(aws cloudformation describe-stacks --stack-name prtimes-hackathon-db \
+    --query 'Stacks[0].Outputs[?OutputKey==`SecurityGroupId`].OutputValue' --output text)" \
+  --no-publicly-accessible
+aws rds wait db-instance-available --db-instance-identifier prtimes-hackathon-2026summer-migcheck
+```
+
+復元に15〜20分かかる。立ったら踏み台越しにトンネルを張って当てる（パスワードは本番と同じ）。
+
+```bash
+ep=$(aws rds describe-db-instances --db-instance-identifier prtimes-hackathon-2026summer-migcheck \
+  --query 'DBInstances[0].Endpoint.Address' --output text)
+ssh -i ~/.ssh/prtimes/hackathon.pem -N -f -L "15435:$ep:5432" ubuntu@13.112.91.188
+
+cd backend
+DATABASE_URL="postgresql://prtimes:${PW}@127.0.0.1:15435/app" uv run alembic upgrade head
+```
+
+通ったら捨てる。**消し忘れると課金が続く。**
+
+```bash
+aws rds delete-db-instance --db-instance-identifier prtimes-hackathon-2026summer-migcheck \
+  --skip-final-snapshot
+```
+
+手元から本番に当てる場合も踏み台越し（[infra/README.md](../infra/README.md)）。
 
 ## 止める
 
