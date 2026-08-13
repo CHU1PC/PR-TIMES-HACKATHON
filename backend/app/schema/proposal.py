@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from app.schema.sparring import PlanDraft
 
 
-class Case(BaseModel):
+class ProposalCase(BaseModel):
     """コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。"""
 
     company_id: int = Field(description="PR TIMES 側の企業ID")
@@ -21,7 +21,7 @@ class Case(BaseModel):
     # exclude=True で JSON に載せない。応答に含めると画面に出す余地が残る(requirements §7)
     reach: int = Field(exclude=True, description="転載したユニーク媒体数。並び替えにだけ使う")
     similarity: float = Field(exclude=True, description="クエリとのコサイン類似度。並び替えにだけ使う")
-    media: list[str] = Field(default_factory=list[str], description="この事例を拾った媒体のうち特徴的なもの")
+    media: list[str] = Field(description="この事例を拾った媒体のうち特徴的なもの")
 
 
 class Suggestion(BaseModel):
@@ -30,7 +30,6 @@ class Suggestion(BaseModel):
     action: str = Field(description="この取り組みに足すこと。1文の命令形にしない, 提案の形にする")
     reason: str = Field(description="なぜそれが効くか。事例に即して書く")
     cited: list[int] = Field(
-        default_factory=list[int],
         # release_id は企業をまたいで重複する(実測3,352個)ので指し先に使えない
         description="根拠にした事例。cases 配列の位置を指す0始まりの添字",
     )
@@ -46,8 +45,7 @@ class ProposalResponse(BaseModel):
     """提案の出力。"""
 
     suggestions: list[Suggestion] = Field(description="足せること。3件")
-    cases: list[Case] = Field(description="根拠にした事例")
+    cases: list[ProposalCase] = Field(description="根拠にした事例")
     media: list[str] = Field(
-        default_factory=list[str],
         description="事例群を拾っていた媒体のうち特徴的なもの。件数は付けない(requirements §7)",
     )

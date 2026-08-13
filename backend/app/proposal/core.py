@@ -13,7 +13,7 @@ from app.retrieval.index import search
 from app.retrieval.media import distinctive
 from app.retrieval.place import resolve_prefecture
 from app.schema import PlanDraft
-from app.schema.proposal import Case, ProposalResponse, Suggestion
+from app.schema.proposal import ProposalCase, ProposalResponse, Suggestion
 
 CATEGORIES_SQL = text("SELECT business_category_name, business_category_id FROM categories")
 
@@ -42,7 +42,7 @@ async def categories() -> dict[str, int]:
     return _categories
 
 
-def format_cases(cases: list[Case]) -> str:
+def format_cases(cases: list[ProposalCase]) -> str:
     """事例をプロンプトに埋める形に整える。**転載件数は渡さない。**
 
     Args:

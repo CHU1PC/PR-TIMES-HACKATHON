@@ -30,7 +30,7 @@ class HearingResponse(BaseModel):
     """1往復ぶんの応答。"""
 
     history: list[Exchange] = Field(description="返答を追加した後の往復履歴")
-    question: str | None = Field(default=None, description="次に聞くこと。聞き終わったら None")
-    hint: str | None = Field(default=None, description="答えやすくするための例示")
+    question: str | None = Field(description="次に聞くこと。聞き終わったら None")
+    hint: str | None = Field(description="答えやすくするための例示")
     candidates: list[Candidate] = Field(description="ここまでに見つかった予定候補")
     done: bool = Field(description="聞き終わったか")

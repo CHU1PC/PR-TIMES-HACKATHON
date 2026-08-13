@@ -7,7 +7,7 @@ from sqlalchemy import bindparam, text
 
 from app.db import session
 from app.db.models import EMBEDDING_DIMENSIONS
-from app.schema.proposal import Case
+from app.schema.proposal import ProposalCase
 
 if TYPE_CHECKING:
     import numpy as np
@@ -36,7 +36,7 @@ SEARCH_SQL = text(f"""
 """).bindparams(bindparam("vector", type_=Vector(EMBEDDING_DIMENSIONS)))
 
 
-def _case(row: Row[Any]) -> Case:
+def _case(row: Row[Any]) -> ProposalCase:
     """1行を API の型に移す。
 
     Args:
@@ -45,7 +45,7 @@ def _case(row: Row[Any]) -> Case:
     Returns:
         事例1件。
     """
-    return Case(
+    return ProposalCase(
         company_id=row.company_id,
         release_id=row.release_id,
         title=row.title,
@@ -60,6 +60,8 @@ def _case(row: Row[Any]) -> Case:
         reach=row.reach,
         # 加点後のスコア。並び替えにしか使わないので加点前に戻さない
         similarity=row.score,
+        # 転載ログから引くのは呼び出し側。ここでは空で作る
+        media=[],
     )
 
 
@@ -69,7 +71,7 @@ async def search(
     business_category_id: int | None = None,
     prefecture_id: int | None = None,
     top_k: int = 8,
-) -> list[Case]:
+) -> list[ProposalCase]:
     """近い事例を返す。意味の近さを主軸に, 同業種・同地域・実際の届き方を加点する。
 
     Args:
