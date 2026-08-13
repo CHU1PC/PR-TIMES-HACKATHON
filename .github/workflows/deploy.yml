@@ -170,15 +170,15 @@ jobs:
         env:
           APP_URL: ${{ steps.stack.outputs.app_url }}
         run: |
-          # 初回作成直後はエッジへの伝搬待ちがあるので数回試す
-          for i in $(seq 1 10); do
+          # CloudFront の初回作成直後はエッジへの伝搬に数分かかる
+          for i in $(seq 1 24); do
             if curl -fsS --max-time 10 "$APP_URL/api/health"; then
               echo
               echo "OK: $APP_URL"
               echo "### デプロイ完了: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
-            echo "まだ応答なし ($i/10). 15秒待つ"
+            echo "まだ応答なし ($i/24). 15秒待つ"
             sleep 15
           done
           echo "::error::$APP_URL/api/health が応答しない"
