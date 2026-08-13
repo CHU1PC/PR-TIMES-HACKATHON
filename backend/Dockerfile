@@ -1,29 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Stage 1: フロントエンドのビルド
+# Stage 1: Python 依存のビルド
 # =============================================================================
-# frontend/ は backend/ の外にあるので, compose の additional_contexts で `frontend`
-# という名前のコンテキストとして渡す (リポジトリ全体を context にすると data/ の
-# DuckDB 700MB 超まで転送されるため)
-FROM oven/bun:1.3-slim AS frontend-builder
-
-WORKDIR /build
-
-# 依存だけ先に入れてレイヤをキャッシュする. src の変更で install をやり直さない
-COPY --from=frontend package.json bun.lock ./
-RUN bun install --frozen-lockfile
-
-COPY --from=frontend . .
-
-# vite と tsc は devDependencies にあるため build には全依存が要る.
-# node_modules はこのステージに閉じ, runtime へは dist だけを持ち込む
-RUN bun run build
-
-# =============================================================================
-# Stage 2: Python 依存のビルド
-# =============================================================================
-FROM python:3.13-slim-bookworm AS python-builder
+FROM python:3.13-slim-bookworm AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /bin/
 
@@ -32,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-WORKDIR /app/backend
+WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
@@ -41,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-default-groups
 
 # =============================================================================
-# Stage 3: Runtime
+# Stage 2: Runtime
 # =============================================================================
 FROM python:3.13-slim-bookworm AS runtime
 
@@ -57,14 +37,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN useradd --create-home --shell /bin/bash appuser
 
-# app/settings/paths.py の ROOT は parents[3]. /app をリポジトリ相当に置くことで
-# STATIC_DIR が /app/frontend/dist に解決される
-WORKDIR /app/backend
+WORKDIR /app
 
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
-COPY --chown=appuser:appuser --from=python-builder /app/backend/.venv ./.venv
+COPY --chown=appuser:appuser --from=builder /app/.venv ./.venv
 COPY --chown=appuser:appuser app/ ./app/
-COPY --chown=appuser:appuser --from=frontend-builder /build/dist /app/frontend/dist
 
 USER appuser
 

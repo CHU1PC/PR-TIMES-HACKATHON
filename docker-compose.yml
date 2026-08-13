@@ -5,9 +5,6 @@ services:
   app:
     build:
       context: ./backend
-      # frontend/ は backend/ の外. ルートを context にすると data/ (700MB 超) まで送られる
-      additional_contexts:
-        frontend: ./frontend
     container_name: prtimes-hackathon-app
     env_file: .env
     environment:
