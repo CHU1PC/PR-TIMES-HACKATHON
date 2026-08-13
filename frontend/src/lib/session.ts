@@ -1,4 +1,12 @@
-import type { Candidate, Exchange, PlanDraft, SlotCode, SlotState } from "@/types";
+import {
+  isCandidate,
+  isExchange,
+  isPlanDraft,
+  isRecord,
+  isSlotState,
+  isTextOrNull,
+} from "@/lib/guards";
+import type { Candidate, Exchange, PlanDraft, SlotState } from "@/types";
 
 export interface ChatMessage {
   /** ai はサーバーの質問、you は顧客の返答 */
@@ -40,80 +48,12 @@ export interface HearingSession {
 const SPARRING_KEY = "prtimes.sparring";
 const HEARING_KEY = "prtimes.hearing";
 
-const SLOT_CODES = new Set<string>(["place", "partner", "people", "novelty", "observation", "video"]);
-const PRESENCES = new Set<string>(["yes", "no", "unknown"]);
-const YES_NO = new Set<string>(["yes", "no"]);
-const TONES = new Set<string>(["causal", "functional"]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isTextOrNull(value: unknown): value is string | null {
-  return value === null || typeof value === "string";
-}
-
-function isEnumOrNull(value: unknown, allowed: Set<string>): boolean {
-  return value === null || (typeof value === "string" && allowed.has(value));
-}
-
-function isTextArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function isSlotCodeArray(value: unknown): value is SlotCode[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string" && SLOT_CODES.has(item));
-}
-
-function isPlanDraft(value: unknown): value is PlanDraft {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.title === "string" &&
-    isTextOrNull(value.start_date) &&
-    isTextOrNull(value.place) &&
-    isTextArray(value.partner) &&
-    isEnumOrNull(value.people, PRESENCES) &&
-    isTextOrNull(value.novelty) &&
-    isTextOrNull(value.observation) &&
-    isEnumOrNull(value.video, YES_NO) &&
-    isSlotCodeArray(value.skipped) &&
-    isSlotCodeArray(value.retried)
-  );
-}
-
-function isSlotState(value: unknown): value is SlotState {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.code === "string" &&
-    SLOT_CODES.has(value.code) &&
-    typeof value.label === "string" &&
-    typeof value.filled === "boolean" &&
-    typeof value.skipped === "boolean" &&
-    typeof value.effect === "string" &&
-    typeof value.tone === "string" &&
-    TONES.has(value.tone)
-  );
-}
-
 function isChatMessage(value: unknown): value is ChatMessage {
   if (!isRecord(value)) return false;
   return (value.role === "ai" || value.role === "you") && typeof value.text === "string";
 }
 
-function isExchange(value: unknown): value is Exchange {
-  if (!isRecord(value)) return false;
-  return typeof value.question === "string" && typeof value.answer === "string";
-}
 
-function isCandidate(value: unknown): value is Candidate {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.title === "string" &&
-    typeof value.category === "string" &&
-    typeof value.source === "string" &&
-    typeof value.reason === "string"
-  );
-}
 
 function isSparringSession(value: unknown): value is SparringSession {
   if (!isRecord(value)) return false;
