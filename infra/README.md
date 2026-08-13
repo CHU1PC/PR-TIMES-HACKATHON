@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | `github-oidc.yaml` | GitHub Actions が引く IAM ロールと OIDC 信頼 | 手元から1回だけ |
 | `ecr.yaml` | バックエンドのイメージ置き場 | CI（無ければ自動で作る） |
-| `app.yaml` | S3 / CloudFront / ALB / ECS Fargate / ログ / ロール | CI |
+| `db.yaml` | アプリの PostgreSQL（pgvector） | 手元から1回だけ |
+| `app.yaml` | S3 / CloudFront / ALB / ECS Fargate / オートスケーリング / ログ / ロール | CI |
 | `deployer-policy.template.json` | 手元の IAM ユーザーに貼る権限。`ACCOUNT_ID` は置換して使う | 手動 |
 
 アカウント ID・VPC ID・サブネット ID はリポジトリに置かない。テンプレートは
@@ -34,7 +35,7 @@ sed "s/ACCOUNT_ID/$(aws sts get-caller-identity --query Account --output text --
 pbpaste | python3 -c "import json,sys; print(len(json.load(sys.stdin)['Statement']), '件')"
 ```
 
-貼り先は**インラインポリシーではなくカスタマー管理ポリシー**。空白を除いて 4,233 文字あり、
+貼り先は**インラインポリシーではなくカスタマー管理ポリシー**。空白を除いて 5,392 文字あり、
 ユーザーのインラインポリシーの上限 2,048 文字に入らない（管理ポリシーは 6,144 文字）。
 
 1. IAM → ポリシー → ポリシーを作成 → JSON タブに貼る → 名前 `prtimes-hackathon-deploy`
@@ -47,9 +48,7 @@ pbpaste | python3 -c "import json,sys; print(len(json.load(sys.stdin)['Statement
 | カスタマー管理ポリシー | 6,144 |
 | ロールのインラインポリシー | 10,240 |
 
-IAM → ユーザー `prtimes-hackathon-deployer` → 許可を追加 → インラインポリシー → JSON に貼る。
-
-### 2. OpenAI のキーを Parameter Store に置く
+### 2. 秘密を Parameter Store に置く
 
 値をシェル履歴に残さないよう、対話で読む。
 
@@ -59,6 +58,28 @@ aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
   --name /prtimes-hackathon/openai-api-key \
   --type SecureString --value "$OPENAI_KEY" --overwrite
 unset OPENAI_KEY
+```
+
+db スタックを作ったあと, 接続 URL も同じように置く（`/prtimes-hackathon/database-url`）。
+タスクはここから `DATABASE_URL` を受け取る。
+
+### 2.5. DB を作ってコーパスを入れる
+
+```bash
+aws cloudformation deploy --profile prtimes --region ap-northeast-1 \
+  --template-file infra/db.yaml --stack-name prtimes-hackathon-db \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides VpcId=<vpc> PrivateSubnetIdA=<subnet> PrivateSubnetIdC=<subnet> \
+    BastionSecurityGroupId=<sg> MasterUserPassword=<32文字>
+```
+
+できたら踏み台経由でトンネルを張り, スキーマとデータを入れる。
+これをやらないと `/api/proposal` がテーブル未作成で 500 になる。
+
+```bash
+cd backend
+uv run alembic upgrade head
+uv run --group etl python -m etl.load_corpus
 ```
 
 ### 3. GitHub Actions 用のロールを作る
@@ -97,7 +118,7 @@ aws cloudformation describe-stacks --profile prtimes --region ap-northeast-1 \
 aws ec2 describe-vpcs --profile prtimes --region ap-northeast-1 \
   --query 'Vpcs[?IsDefault==`false`].VpcId' --output text
 
-# PUBLIC_SUBNET_IDS — AZ 違いで2つ。カンマ区切りで1つの値にする
+# PUBLIC_SUBNET_ID — 既存のパブリックサブネット1枚。1c は app スタックが作る
 aws ec2 describe-subnets --profile prtimes --region ap-northeast-1 \
   --filters Name=map-public-ip-on-launch,Values=true \
   --query 'Subnets[].[SubnetId,AvailabilityZone]' --output text
@@ -109,11 +130,11 @@ GitHub → Settings → Secrets and variables → Actions → New repository sec
 | --- | --- |
 | `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::...:role/prtimes-hackathon-github-actions` |
 | `VPC_ID` | `vpc-xxxxxxxx` |
-| `PUBLIC_SUBNET_IDS` | `subnet-aaaa,subnet-bbbb` |
+| `PUBLIC_SUBNET_ID` | `subnet-aaaa` |
 
 ## 以降のデプロイ
 
-`main` か `develop` に push すると `.github/workflows/deploy.yml` が動く。
+`main` に push すると `.github/workflows/deploy.yml` が動く。
 手で回すなら Actions タブ → deploy → Run workflow。
 
 やっていることは4つ。
@@ -218,10 +239,10 @@ gh workflow run deploy.yml --ref main && sleep 5 && gh run watch
 aws cloudformation deploy --profile prtimes --region ap-northeast-1 \
   --template-file infra/app.yaml --stack-name prtimes-hackathon-app \
   --capabilities CAPABILITY_NAMED_IAM --no-fail-on-empty-changeset \
-  --parameter-overrides DesiredCount=0 <他のパラメータも同じ値で>
+  --parameter-overrides MinTasks=0 MaxTasks=0 <他のパラメータも同じ値で>
 ```
 
-全部消すときは app → ecr → oidc の順。S3 は中身を空にしないと消えない。
+全部消すときは app → db → ecr → oidc の順。S3 は中身を空にしないと消えない。
 
 ```bash
 aws s3 rm "s3://$(aws cloudformation describe-stacks --stack-name prtimes-hackathon-app \
@@ -234,7 +255,7 @@ aws cloudformation delete-stack --stack-name prtimes-hackathon-app
 | 症状 | 原因と直し方 |
 | --- | --- |
 | `UnauthorizedOperation` / `AccessDenied` | 手順1のポリシーが貼られていない。エラーが名指しするアクションを足す |
-| ALB が 2 AZ 必要と言われる | `PUBLIC_SUBNET_IDS` が同じ AZ の2つ。AZ 違いで選び直す |
+| ALB が 2 AZ 必要と言われる | `PUBLIC_SUBNET_ID` が同じ AZ の2つ。AZ 違いで選び直す |
 | タスクが起動と停止を繰り返す | CloudWatch Logs の `/ecs/...-backend` を見る。キーの取得失敗が多い |
 | ターゲットが unhealthy のまま | ヘルスチェックは `/api/health`。ルータの prefix を変えたら合わせる |
 | `CachePolicyId` が無いと言われる | `aws cloudfront list-cache-policies --type managed` で現行の ID を確認して差し替える |
