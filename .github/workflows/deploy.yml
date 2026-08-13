@@ -8,12 +8,11 @@ on:
       - "**.md"
   workflow_dispatch:
 
-# 同じブランチのデプロイが重なるとタスク定義の世代が混ざるので直列にする
+# 待ち行列はブランチではなくデプロイ先で決める。env は concurrency で使えないのでリテラル
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-prtimes-hackathon-app
   cancel-in-progress: false
 
-# 既定は読むだけ。OIDC は deploy ジョブにだけ与える
 permissions:
   contents: read
 
