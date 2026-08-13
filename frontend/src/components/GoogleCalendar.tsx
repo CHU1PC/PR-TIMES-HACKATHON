@@ -6,7 +6,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { EventClickArg } from "@fullcalendar/core";
 
 import { calendarEvents, calendarLoginUrl, calendarStatus, type ApiFailure } from "@/api";
-import type { CalendarEvent, CalendarRange } from "@/types";
+import type { CalendarEvent, CalendarRange, CalendarStatus } from "@/types";
 
 /** 先月頭から3ヶ月先の頭まで引く */
 function currentRange(): CalendarRange {
@@ -18,7 +18,7 @@ function currentRange(): CalendarRange {
 }
 
 export function GoogleCalendar() {
-  const [connected, setConnected] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
@@ -32,22 +32,24 @@ export function GoogleCalendar() {
     controllerRef.current = controller;
     setFailure(null);
 
-    const status = await calendarStatus(controller.signal);
+    const current = await calendarStatus(controller.signal);
     if (controller.signal.aborted) return;
-    if (!status.ok) {
-      if (status.kind !== "cancelled") setFailure(status);
+    if (!current.ok) {
+      if (current.kind !== "cancelled") setFailure(current);
       return;
     }
-    setConnected(status.data.connected);
-    if (!status.data.connected) return;
+    setStatus(current.data);
+    if (!current.data.configured || !current.data.connected) return;
 
     const result = await calendarEvents(currentRange(), controller.signal);
     if (controller.signal.aborted) return;
     if (!result.ok) {
-      if (result.kind !== "cancelled") setFailure(result);
+      // セッション切れは異常ではなく未連携。赤く出さずに連携ボタンへ戻す
+      if (result.kind === "unauthorized") setStatus({ ...current.data, connected: false });
+      else if (result.kind !== "cancelled") setFailure(result);
       return;
     }
-    setConnected(result.data.connected);
+    setStatus({ ...current.data, connected: result.data.connected });
     setEvents(result.data.events);
   }, []);
 
@@ -81,7 +83,7 @@ export function GoogleCalendar() {
     );
   }
 
-  if (connected === null) {
+  if (status === null) {
     return (
       <section className="calendar">
         <p className="state" role="status" aria-live="polite">
@@ -91,7 +93,17 @@ export function GoogleCalendar() {
     );
   }
 
-  if (!connected) {
+  // 環境変数が入っていない。押しても 503 になるので連携ボタンは出さない
+  if (!status.configured) {
+    return (
+      <section className="calendar">
+        <h2 className="calendar__title">Googleカレンダー</h2>
+        <p className="page__lead">この環境ではGoogleカレンダー連携を使えません。</p>
+      </section>
+    );
+  }
+
+  if (!status.connected) {
     return (
       <section className="calendar">
         <h2 className="calendar__title">Googleカレンダー</h2>

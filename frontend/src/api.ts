@@ -1,14 +1,14 @@
 import type { z } from "zod";
 
 import {
-  calendarEventsResponseSchema,
+  calendarEventsSchema,
   calendarStatusSchema,
   hearingResponseSchema,
   proposalResponseSchema,
   sparringResponseSchema,
 } from "@/lib/schemas";
 import type {
-  CalendarEventsResponse,
+  CalendarEvents,
   CalendarRange,
   CalendarStatus,
   HearingResponse,
@@ -31,15 +31,21 @@ const TIMEOUT_MS = 30_000;
 // 提案は 業種分類 + 埋め込み + 事例8件(各1000字)を読ませる生成 の3段なので, さらに長い
 const PROPOSAL_TIMEOUT_MS = 60_000;
 
+const UNAUTHORIZED = 401;
+
+// dev は 5173 と 8000 が別オリジンなので, 指定しないとセッション Cookie が飛ばない
+const WITH_SESSION: RequestInit = { credentials: "include" };
+
 const MESSAGES = {
   timeout: "時間がかかっています。もう一度お試しください。",
   network: "サーバーにつながりませんでした。もう一度お試しください。",
   server: "サーバーが応答しませんでした。もう一度お試しください。",
   malformed: "サーバーの応答を読み取れませんでした。",
+  unauthorized: "ログインの有効期限が切れました。",
   cancelled: "",
 } as const satisfies Record<ApiFailureKind, string>;
 
-export type ApiFailureKind = "timeout" | "network" | "server" | "malformed" | "cancelled";
+export type ApiFailureKind = "timeout" | "network" | "server" | "malformed" | "unauthorized" | "cancelled";
 
 export interface ApiFailure {
   kind: ApiFailureKind;
@@ -69,6 +75,10 @@ async function request<T>(
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
     const response = await fetch(`${API_BASE}${path}`, { ...init, signal: combined });
+    // 401 は呼び出し側が「未連携」に倒したいので, サーバー障害と分けて返す
+    if (response.status === UNAUTHORIZED) {
+      return { ok: false, kind: "unauthorized", message: MESSAGES.unauthorized };
+    }
     if (!response.ok) return { ok: false, kind: "server", message: MESSAGES.server };
     const payload: unknown = await response.json();
     const parsed = schema.safeParse(payload);
@@ -94,14 +104,6 @@ function post<T>(
   return request(path, init, schema, signal, timeoutMs);
 }
 
-function get<T>(
-  path: string,
-  schema: z.ZodType<T>,
-  signal?: AbortSignal,
-  timeoutMs: number = TIMEOUT_MS,
-): Promise<ApiResult<T>> {
-  return request(path, { method: "GET" }, schema, signal, timeoutMs);
-}
 
 export function sparringStep(turn: SparringTurn, signal?: AbortSignal): Promise<ApiResult<SparringResponse>> {
   return post<SparringResponse>("/api/sparring/step", turn, sparringResponseSchema, signal);
@@ -115,15 +117,21 @@ export function fetchProposal(request: ProposalRequest, signal?: AbortSignal): P
   return post<ProposalResponse>("/api/proposal", request, proposalResponseSchema, signal, PROPOSAL_TIMEOUT_MS);
 }
 
+/** 未ログインでも 401 にならない。連携ボタンを出すかの判断に使う */
 export function calendarStatus(signal?: AbortSignal): Promise<ApiResult<CalendarStatus>> {
-  return get<CalendarStatus>("/api/calendar/status", calendarStatusSchema, signal);
+  const init: RequestInit = { ...WITH_SESSION, method: "GET" };
+  return request("/api/calendar/status", init, calendarStatusSchema, signal);
 }
 
-export function calendarEvents(
-  range: CalendarRange,
-  signal?: AbortSignal,
-): Promise<ApiResult<CalendarEventsResponse>> {
-  return post<CalendarEventsResponse>("/api/calendar/events", range, calendarEventsResponseSchema, signal);
+/** 本人の予定だけを返す。未ログインとセッション切れは 401 */
+export function calendarEvents(range: CalendarRange, signal?: AbortSignal): Promise<ApiResult<CalendarEvents>> {
+  const init: RequestInit = {
+    ...WITH_SESSION,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(range),
+  };
+  return request("/api/calendar/events", init, calendarEventsSchema, signal);
 }
 
 /** 連携はブラウザごと Google へ送るので, fetch せず遷移先だけ返す */
