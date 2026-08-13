@@ -39,7 +39,11 @@ export function HearingPage() {
     setFailure(null);
 
     const result = await hearingStep(turn, controller.signal);
-    if (controller.signal.aborted) return;
+    if (controller.signal.aborted) {
+      // 後続の送信が無いまま中断されると pending が戻らず, 送信ボタンが永久に無効になる
+      if (controllerRef.current === controller) setPending(false);
+      return;
+    }
     setPending(false);
     if (!result.ok) {
       if (result.kind !== "cancelled") setFailure(result);
