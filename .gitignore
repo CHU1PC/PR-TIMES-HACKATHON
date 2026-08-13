@@ -1,0 +1,28 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# ETL 出力（RDS由来のデータはコミットしない）
+data/
+
+# misc
+.DS_Store
+*.log
+
+# 計画メモ（ツールのスクラッチ）
+.hermes/
