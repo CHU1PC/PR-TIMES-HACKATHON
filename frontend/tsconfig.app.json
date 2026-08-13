@@ -28,5 +28,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // 生成物は kubb が保証する。取り込むときは noUnusedLocals を切る必要がある
+  "exclude": ["src/gen"]
 }
