@@ -24,8 +24,7 @@ env:
   APP_STACK: prtimes-hackathon-app
 
 jobs:
-  # 第三者のコードが走る（bun の postinstall, pytest の conftest）。
-  # ここに id-token を与えるとデプロイロールを引かれるので与えない
+  # 第三者のコードが走るので id-token を与えない
   check:
     runs-on: ubuntu-latest
     steps:
@@ -65,9 +64,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ---------------------------------------------------------------------
-      # バックエンドのイメージ
-      # ---------------------------------------------------------------------
+      # === バックエンドのイメージ ===
       - name: ECR スタックを作る（無ければ）
         run: |
           aws cloudformation deploy \
@@ -88,9 +85,7 @@ jobs:
           docker push "$uri"
           echo "uri=$uri" >> "$GITHUB_OUTPUT"
 
-      # ---------------------------------------------------------------------
-      # インフラ
-      # ---------------------------------------------------------------------
+      # === インフラ ===
       - name: VPC に紐づく値を引く
         id: net
         env:
@@ -151,9 +146,7 @@ jobs:
                 esac
               done >> "$GITHUB_OUTPUT"
 
-      # ---------------------------------------------------------------------
-      # フロント
-      # ---------------------------------------------------------------------
+      # === フロント ===
       - uses: oven-sh/setup-bun@v2
 
       - name: フロントをビルド
@@ -167,8 +160,7 @@ jobs:
         env:
           BUCKET: ${{ steps.stack.outputs.bucket }}
         run: |
-          # ハッシュが付くのは dist/assets/ だけ。public/ の favicon 等に immutable を付けると
-          # 差し替えても最大1年ブラウザが古いまま持つ
+          # ハッシュが付くのは assets/ だけ。public/ に immutable を付けると差し替えられない
           aws s3 sync frontend/dist "s3://$BUCKET" --delete \
             --cache-control 'public,max-age=300'
           aws s3 sync frontend/dist/assets "s3://$BUCKET/assets" \
@@ -182,9 +174,7 @@ jobs:
             --distribution-id '${{ steps.stack.outputs.distribution }}' \
             --paths '/*' >/dev/null
 
-      # ---------------------------------------------------------------------
-      # 確認
-      # ---------------------------------------------------------------------
+      # === 確認 ===
       - name: 疎通を確かめる
         env:
           APP_URL: ${{ steps.stack.outputs.app_url }}
