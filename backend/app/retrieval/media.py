@@ -43,7 +43,10 @@ async def distinctive(pairs: list[tuple[int, int]]) -> tuple[dict[tuple[int, int
         return {}, []
 
     total = rows[0].total
-    limit = len(pairs) * UBIQUITOUS_RATIO
+    if not total:
+        return {}, []
+    # 事例が1〜2件だと割合の足切りが全媒体を消す
+    limit = max(len(pairs) * UBIQUITOUS_RATIO, 1)
 
     # 事例群での出現数 × 希少さ。全国メディアは希少さが効かず, 地方紙と地域経済新聞が上に来る
     hits: dict[str, int] = {}
