@@ -1,4 +1,4 @@
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -37,6 +37,21 @@ class Settings(BaseSettings):
         default=True,
         description="Cookie に Secure を付ける. HTTP のローカル開発でだけ false にする",
     )
+
+    @model_validator(mode="after")
+    def _forbid_wildcard_origin(self) -> "Settings":
+        """Cookie を送るので許可先を絞る。
+
+        Returns:
+            検証済みの設定。
+
+        Raises:
+            ValueError: ALLOWED_ORIGINS に * が入っているとき。
+        """
+        if "*" in self.ALLOWED_ORIGINS:
+            msg = "ALLOWED_ORIGINS に * は使えない。セッション Cookie を送るので許可先を明示する"
+            raise ValueError(msg)
+        return self
 
 
 settings = Settings()
