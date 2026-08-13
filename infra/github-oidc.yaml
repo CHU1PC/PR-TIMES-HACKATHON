@@ -1,0 +1,241 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: GitHub Actions が長期キー無しで AWS を触るための OIDC 信頼. app スタックより先に一度だけ作る
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: prtimes-hackathon
+
+  AllowedSubject:
+    Type: String
+    Default: "repo:CHU1PC/PR-TIMES-HACKATHON:ref:refs/heads/main"
+    Description: >-
+      このパターンに合う GitHub のワークフローだけがロールを引ける.
+      main 以外のブランチからも fork からも引けない.
+
+  CreateProvider:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: 同じアカウントに GitHub 用の OIDC プロバイダが既にあるなら false
+
+  ExistingProviderArn:
+    Type: String
+    Default: ""
+    Description: CreateProvider=false のときだけ, 既存プロバイダの ARN を入れる
+
+Conditions:
+  ShouldCreateProvider: !Equals [!Ref CreateProvider, "true"]
+
+Resources:
+  # AWS は GitHub の証明書を自前の信頼ストアで検証するので thumbprint は実質使われない。
+  # CloudFormation が空リストを受け付けないので, 公開されている値を1つ置く
+  Provider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${NamePrefix}-github-actions"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If [ShouldCreateProvider, !Ref Provider, !Ref ExistingProviderArn]
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Ref AllowedSubject
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CloudFormationOnThisProjectsStacks
+                Effect: Allow
+                Action: cloudformation:*
+                Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NamePrefix}-*/*"
+
+              - Sid: CloudFormationAccountWideReads
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:ListExports
+                Resource: "*"
+
+              - Sid: FrontendBucket
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub "arn:aws:s3:::${NamePrefix}-*-frontend-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-*-frontend-${AWS::AccountId}/*"
+
+              - Sid: CloudFront
+                Effect: Allow
+                Action:
+                  - cloudfront:CreateDistribution
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:ListTagsForResource
+                  - cloudfront:CreateOriginAccessControl
+                  - cloudfront:GetOriginAccessControl
+                  - cloudfront:GetOriginAccessControlConfig
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetInvalidation
+                  - cloudfront:ListCachePolicies
+                  - cloudfront:GetCachePolicy
+                  - cloudfront:ListOriginRequestPolicies
+                  - cloudfront:GetOriginRequestPolicy
+                Resource: "*"
+
+              - Sid: ReadNetwork
+                Effect: Allow
+                Action: ec2:Describe*
+                Resource: "*"
+
+              - Sid: ManageOwnSecurityGroups
+                Effect: Allow
+                Action:
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:ModifySecurityGroupRules
+                  - ec2:GetManagedPrefixListEntries
+                  - ec2:CreateTags
+                  - ec2:DeleteTags
+                Resource: "*"
+
+              # VPC にはパブリックサブネットが1枚しかなく ALB が作れないので, もう1枚足す。
+              # 既存のサブネットとルートテーブルには触らない
+              - Sid: ManageProjectNetwork
+                Effect: Allow
+                Action:
+                  - ec2:CreateSubnet
+                  - ec2:DeleteSubnet
+                  - ec2:ModifySubnetAttribute
+                  - ec2:CreateRouteTable
+                  - ec2:DeleteRouteTable
+                  - ec2:CreateRoute
+                  - ec2:DeleteRoute
+                  - ec2:AssociateRouteTable
+                  - ec2:DisassociateRouteTable
+                Resource: "*"
+
+              - Sid: ContainerRegistry
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:CreateRepository
+                  - ecr:DeleteRepository
+                  - ecr:DescribeRepositories
+                  - ecr:DescribeImages
+                  - ecr:ListTagsForResource
+                  - ecr:TagResource
+                  - ecr:UntagResource
+                  - ecr:PutLifecyclePolicy
+                  - ecr:GetLifecyclePolicy
+                  - ecr:DeleteLifecyclePolicy
+                  - ecr:SetRepositoryPolicy
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DeleteRepositoryPolicy
+                  - ecr:PutImageScanningConfiguration
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchDeleteImage
+                Resource: "*"
+
+              - Sid: EcsAndLoadBalancer
+                Effect: Allow
+                Action:
+                  - ecs:*
+                  - elasticloadbalancing:*
+                  - application-autoscaling:*
+                Resource: "*"
+
+              - Sid: Logs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutRetentionPolicy
+                  - logs:ListTagsForResource
+                  - logs:TagResource
+                  - logs:UntagResource
+                  - logs:GetLogEvents
+                  - logs:FilterLogEvents
+                Resource: "*"
+
+              # 作れるロールをこの名前空間に閉じる. "*" にすると CI が任意権限のロールを
+              # 作って引き渡せてしまう
+              - Sid: RolesForThisProjectOnly
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${NamePrefix}-*"
+
+              - Sid: EcsNeedsItsServiceLinkedRoleOnFirstUse
+                Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    iam:AWSServiceName:
+                      - ecs.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+
+              # CI はキーの値を使わない. タスク定義に ARN を書くために存在確認するだけ。
+              # ssm:DescribeParameters は資源指定に対応せず必ず拒否されるので入れない
+              - Sid: ReadOpenAiKeyParameter
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/*"
+      Tags:
+        - Key: Project
+          Value: !Ref NamePrefix
+
+Outputs:
+  DeployRoleArn:
+    Description: GitHub Actions の configure-aws-credentials に role-to-assume として渡す
+    Value: !GetAtt DeployRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DeployRoleArn"

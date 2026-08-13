@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: アプリの PostgreSQL. コーパスの類似検索を pgvector で行う. app スタックより先に作る
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: prtimes-hackathon-2026summer
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: 既存 VPC
+
+  PrivateSubnetIdA:
+    Type: AWS::EC2::Subnet::Id
+    Description: DB を置く既存のプライベートサブネット (ap-northeast-1a)
+
+  PrivateSubnetIdC:
+    Type: AWS::EC2::Subnet::Id
+    Description: 同上 (ap-northeast-1c). サブネットグループは AZ 違いで2枚必要
+
+  BastionSecurityGroupId:
+    Type: String
+    AllowedPattern: "^sg-[0-9a-f]+$"
+    Description: >-
+      コーパス投入時に踏み台にする EC2 の SG. RDS はプライベートなので
+      手元からは EC2 経由の SSH トンネルでしか入れない
+
+  MasterUsername:
+    Type: String
+    Default: prtimes
+
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: 手元で生成して渡す. Parameter Store にも同じ値を SecureString で置く
+
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.small
+    AllowedValues: [db.t4g.micro, db.t4g.small, db.t4g.medium]
+    Description: >-
+      12.9万件 × 256次元 = 132MB のベクトルを毎クエリ走査する.
+      shared_buffers に載り切らないと遅くなるので micro (1GB) より small (2GB) を既定にする
+
+  EngineVersion:
+    Type: String
+    Default: "17"
+    Description: pgvector は 15.2 以降で使える. メジャーだけ書くと最新のマイナーが選ばれる
+
+Resources:
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub "${NamePrefix}-app"
+      # アプリ用。既存のプライベートサブネットに置く
+      DBSubnetGroupDescription: Application database, on the existing private subnets
+      SubnetIds: [!Ref PrivateSubnetIdA, !Ref PrivateSubnetIdC]
+      Tags:
+        - Key: Project
+          Value: prtimes-hackathon
+
+  # inbound は矢印1本につき1つ。ここでは投入用の踏み台ぶんだけ作り,
+  # タスクからの1本は app スタックが足す（SG の相互参照を避けるため）
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      # AWS は SG の説明文に ASCII しか許さない。日本語はコメントへ逃がす
+      GroupDescription: PostgreSQL for the application
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # 踏み台 EC2 からの投入と確認
+        - Description: From the bastion EC2, for loading and inspection
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BastionSecurityGroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-app-db"
+        - Key: Project
+          Value: prtimes-hackathon
+
+  Instance:
+    Type: AWS::RDS::DBInstance
+    # スタックを消しても直前のスナップショットが残る。コーパスは作り直せるが,
+    # 今後入るユーザーやイベントのデータは作り直せない
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "${NamePrefix}-app"
+      DBName: app
+      Engine: postgres
+      EngineVersion: !Ref EngineVersion
+      DBInstanceClass: !Ref DbInstanceClass
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      # コーパス本文 110MB + ベクトル 132MB + 索引。gp3 の最小が 20GB
+      AllocatedStorage: "20"
+      StorageType: gp3
+      StorageEncrypted: true
+      DBSubnetGroupName: !Ref SubnetGroup
+      VPCSecurityGroups: [!GetAtt SecurityGroup.GroupId]
+      # 手元から直接は繋がない。投入も参照も VPC の中から行う
+      PubliclyAccessible: false
+      MultiAZ: false
+      # コーパスだけなら不要だが, ユーザーやイベントのデータが入る前提で最低1世代は残す
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: Project
+          Value: prtimes-hackathon
+
+Outputs:
+  Endpoint:
+    Description: 接続先ホスト名
+    Value: !GetAtt Instance.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-Endpoint"
+
+  Port:
+    Value: !GetAtt Instance.Endpoint.Port
+
+  SecurityGroupId:
+    Description: app スタックが「タスク → DB」の inbound を足す先
+    Value: !GetAtt SecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroupId"
+
+  DatabaseName:
+    Value: app
