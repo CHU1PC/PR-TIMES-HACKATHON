@@ -150,9 +150,12 @@ Resources:
               - cloudfront:GetOriginRequestPolicy
             Resource: "*"
 
+          # ELB が LB 作成時に呼ぶ GetSecurityGroupsForVpc は Describe* に含まれない
           - Sid: ReadNetwork
             Effect: Allow
-            Action: ec2:Describe*
+            Action:
+              - ec2:Describe*
+              - ec2:GetSecurityGroupsForVpc
             Resource: "*"
 
           - Sid: ManageOwnSecurityGroups
