@@ -728,10 +728,11 @@ textarea:focus-visible {
   background: #fcfcfe;
 }
 
+/* クリックできるのは中の予定チップ。セル自体はもう遷移しない */
 .calendar-day {
   background: transparent;
   border: 0;
-  cursor: pointer;
+  cursor: default;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -743,20 +744,8 @@ textarea:focus-visible {
   width: 100%;
 }
 
-.calendar-day.has-event:hover {
-  background: #faf7ff;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 139, 0.3);
-}
-
 .calendar-day--empty {
   cursor: default;
-}
-
-.calendar-day:focus-visible {
-  box-shadow: inset 0 0 0 3px rgba(0, 0, 139, 0.48);
-  outline: 0;
-  position: relative;
-  z-index: 1;
 }
 
 .is-outside .calendar-day {
@@ -787,6 +776,7 @@ textarea:focus-visible {
 .calendar-event {
   align-items: flex-start;
   border-radius: 6px;
+  cursor: pointer;
   display: flex;
   font-size: 10px;
   font-weight: 700;
@@ -795,6 +785,16 @@ textarea:focus-visible {
   margin-top: 4px;
   max-width: 100%;
   padding: 4px 5px;
+  text-decoration: none;
+}
+
+.calendar-event:hover {
+  filter: brightness(0.94);
+}
+
+.calendar-event:focus-visible {
+  outline: 2px solid #00008b;
+  outline-offset: 1px;
 }
 
 .calendar-event > span:first-child {
@@ -2319,7 +2319,6 @@ textarea:focus-visible {
 
 .app-sidebar__nav-item:hover,
 .app-sidebar__nav-item.is-active,
-.calendar-day.has-event:hover,
 .ranking-item:hover {
   background: rgba(0, 0, 139, 0.07);
   color: #00008b;
@@ -2354,7 +2353,6 @@ textarea:focus-visible {
 }
 
 .calendar-day.is-today,
-.calendar-day.has-event:focus-visible,
 .ranking-item:focus-visible {
   box-shadow: inset 0 0 0 2px #00008b;
 }
@@ -2402,12 +2400,4 @@ textarea:focus-visible {
   box-shadow: 0 0 0 4px rgba(0, 0, 139, 0.08);
 }
 
-.calendar-day.has-event:hover {
-  background: rgba(0, 0, 139, 0.07);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 139, 0.3);
-}
-
-.calendar-day:focus-visible {
-  box-shadow: inset 0 0 0 3px rgba(0, 0, 139, 0.48);
-}
 
