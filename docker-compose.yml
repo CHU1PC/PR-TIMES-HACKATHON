@@ -12,7 +12,7 @@ services:
       MALLOC_ARENA_MAX: "2"
     ports:
       # 80 は pgAdmin (gunicorn) が使用中. 絶対に奪わない
-      - "8080:8080"
+      - "8000:8000"
     restart: unless-stopped
     # t3.medium は 3.7GB を pgAdmin と分け合う. アプリ側が食い潰さないよう上限を切る
     mem_limit: 1500m

@@ -45,11 +45,11 @@ COPY --chown=appuser:appuser app/ ./app/
 
 USER appuser
 
-# 80 は EC2 で pgAdmin が使用中. 本アプリは 8080 に載せる
-EXPOSE 8080
+# fastapi dev の既定に合わせる. ALB のターゲットグループもこのポートを見る
+EXPOSE 8000
 
 # start-period は uv の起動 + import (langchain) を待つ余裕
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8080/api/health || exit 1
+    CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
 
-CMD ["uv", "run", "--no-sync", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uv", "run", "--no-sync", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
