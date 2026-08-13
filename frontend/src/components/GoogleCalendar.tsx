@@ -137,7 +137,7 @@ export function GoogleCalendar() {
               <strong>日時</strong>
               <br />
               {formatDate(selectedEvent.start)}
-              {" ～ "}
+              {" ~ "}
               {formatDate(selectedEvent.end)}
             </p>
 
