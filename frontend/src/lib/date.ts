@@ -22,10 +22,10 @@ export function isValidDate(value: string | null | undefined): value is string {
   return typeof value === "string" && parseDate(value) !== null;
 }
 
-/** "YYYY-MM-DD" を「2026年9月1日（火）」にする。読めない値はそのまま返す。 */
+/** "YYYY-MM-DD" を「2026年9月1日(火)」にする。読めない値はそのまま返す。 */
 export function formatDate(value: string): string {
   const parsed = parseDate(value);
   if (!parsed) return value;
   const weekday = WEEKDAYS[parsed.date.getDay()] ?? "";
-  return `${parsed.year}年${parsed.month}月${parsed.day}日（${weekday}）`;
+  return `${parsed.year}年${parsed.month}月${parsed.day}日(${weekday})`;
 }

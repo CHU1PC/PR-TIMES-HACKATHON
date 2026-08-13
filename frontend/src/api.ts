@@ -58,7 +58,7 @@ function failureOf(error: unknown): ApiFailure {
   const name = error instanceof DOMException ? error.name : "";
   if (name === "TimeoutError") return { kind: "timeout", message: MESSAGES.timeout };
   if (name === "AbortError") return { kind: "cancelled", message: MESSAGES.cancelled };
-  // JSON として読めない = 繋がってはいるが別物が返っている（proxy 未設定で index.html が返る等）
+  // JSON として読めない = 繋がってはいるが別物が返っている(proxy 未設定で index.html が返る等)
   if (error instanceof SyntaxError) return { kind: "malformed", message: MESSAGES.malformed };
   return { kind: "network", message: MESSAGES.network };
 }
