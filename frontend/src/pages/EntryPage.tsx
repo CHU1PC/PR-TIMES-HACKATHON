@@ -30,22 +30,22 @@ export function EntryPage() {
   return (
     <section className="page home-page creation-page">
       <header className="home-hero creation-hero">
-        <Link to="/" className="creation-hero__back">
-          <Icon name="arrow-left" size={16} />
-          ホームに戻る
-        </Link>
+        <div className="creation-hero__toolbar">
+          <Link to="/" className="creation-hero__back">
+            <Icon name="arrow-left" size={16} />
+            ホームに戻る
+          </Link>
+          {selectedDate ? (
+            <p className="creation-hero__date">
+              <Icon name="calendar" size={16} />
+              選択日：{formatDate(selectedDate)}
+            </p>
+          ) : null}
+        </div>
         <p className="home-hero__eyebrow">
           <Icon name="sparkles" size={17} />
           PRアイデアを形にする
         </p>
-        <h1 className="home-hero__title">{selectedDate ? `${formatDate(selectedDate)}のPRネタを作る` : "新しいPRネタを作る"}</h1>
-        <p className="home-hero__lead">これからの予定を、届きやすいPRネタへ。AIと一緒に内容を整理しましょう。</p>
-        {selectedDate ? (
-          <p className="creation-hero__date">
-            <Icon name="calendar" size={16} />
-            選択日：{formatDate(selectedDate)}
-          </p>
-        ) : null}
       </header>
 
       <form id="new-plan" className="entry entry--dashboard" onSubmit={handleSubmit}>

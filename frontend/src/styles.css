@@ -488,6 +488,23 @@ textarea:focus-visible {
   margin: 6px 0 0;
 }
 
+.creation-hero {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.creation-hero__toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.creation-hero .home-hero__eyebrow {
+  margin: 0;
+}
+
 .creation-hero__back {
   align-items: center;
   color: var(--ink-soft);
@@ -495,7 +512,7 @@ textarea:focus-visible {
   font-size: 11px;
   font-weight: 700;
   gap: 6px;
-  margin-bottom: 15px;
+  margin: 0;
   text-decoration: none;
 }
 
@@ -513,7 +530,7 @@ textarea:focus-visible {
   font-size: 11px;
   font-weight: 800;
   gap: 7px;
-  margin: 14px 0 0;
+  margin: 0;
   min-height: 32px;
   padding: 0 12px;
 }
