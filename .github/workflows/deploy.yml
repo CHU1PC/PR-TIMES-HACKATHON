@@ -13,8 +13,8 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
+# 既定は読むだけ。OIDC は deploy ジョブにだけ与える
 permissions:
-  id-token: write # OIDC のトークン発行に要る
   contents: read
 
 env:
@@ -24,6 +24,8 @@ env:
   APP_STACK: prtimes-hackathon-app
 
 jobs:
+  # 第三者のコードが走る（bun の postinstall, pytest の conftest）。
+  # ここに id-token を与えるとデプロイロールを引かれるので与えない
   check:
     runs-on: ubuntu-latest
     steps:
@@ -52,6 +54,9 @@ jobs:
   deploy:
     needs: check
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # このジョブだけが AWS のロールを引ける
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -121,8 +126,20 @@ jobs:
               DbSecurityGroupId='${{ steps.net.outputs.db_sg }}' \
               ImageUri='${{ steps.image.outputs.uri }}'
 
+      # 同じコミットを流し直すと change set が空になり, 新しいイメージでも入れ替わらない
+      - name: サービスを必ず入れ替える
+        run: |
+          aws ecs update-service --force-new-deployment \
+            --cluster "$(aws cloudformation describe-stacks --stack-name "$APP_STACK" \
+              --query 'Stacks[0].Outputs[?OutputKey==`ClusterName`].OutputValue' --output text)" \
+            --service "$(aws cloudformation describe-stacks --stack-name "$APP_STACK" \
+              --query 'Stacks[0].Outputs[?OutputKey==`ServiceName`].OutputValue' --output text)" \
+            >/dev/null
+
       - name: スタックの出力を読む
         id: stack
+        # 既定のシェルは bash -e で pipefail が付かない。明示するとパイプ左側の失敗も拾う
+        shell: bash
         run: |
           aws cloudformation describe-stacks --stack-name "$APP_STACK" \
             --query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' --output text \
@@ -150,10 +167,12 @@ jobs:
         env:
           BUCKET: ${{ steps.stack.outputs.bucket }}
         run: |
-          # 資産はファイル名にハッシュが付くので長く持たせ, index.html だけ毎回取りに行かせる
+          # ハッシュが付くのは dist/assets/ だけ。public/ の favicon 等に immutable を付けると
+          # 差し替えても最大1年ブラウザが古いまま持つ
           aws s3 sync frontend/dist "s3://$BUCKET" --delete \
-            --cache-control 'public,max-age=31536000,immutable' \
-            --exclude index.html
+            --cache-control 'public,max-age=300'
+          aws s3 sync frontend/dist/assets "s3://$BUCKET/assets" \
+            --cache-control 'public,max-age=31536000,immutable'
           aws s3 cp frontend/dist/index.html "s3://$BUCKET/index.html" \
             --cache-control 'no-cache'
 
