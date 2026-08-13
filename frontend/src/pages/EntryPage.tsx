@@ -38,7 +38,7 @@ export function EntryPage() {
           {selectedDate ? (
             <p className="creation-hero__date">
               <Icon name="calendar" size={16} />
-              選択日：{formatDate(selectedDate)}
+              選択日: {formatDate(selectedDate)}
             </p>
           ) : null}
         </div>
@@ -71,7 +71,7 @@ export function EntryPage() {
             type="text"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="例：9月から郵便局の窓口で商品を取り扱ってもらう"
+            placeholder="例: 9月から郵便局の窓口で商品を取り扱ってもらう"
           />
           <button type="submit" className="button button--primary button--wide entry__submit" disabled={title.trim() === ""}>
             この予定で進む
