@@ -623,3 +623,53 @@ textarea {
     gap: 0;
   }
 }
+
+.calendar {
+  margin-top: 48px;
+  padding: 24px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+
+.calendar__title {
+  margin-bottom: 20px;
+}
+
+.calendar__body {
+  margin-top: 16px;
+}
+
+.calendar-detail {
+  margin-top: 24px;
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.calendar-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calendar-detail__header h3 {
+  margin: 0;
+}
+
+.calendar-detail__close {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.calendar-detail__content {
+  margin-top: 20px;
+}
+
+.calendar-detail__content p {
+  margin-bottom: 20px;
+  line-height: 1.7;
+}
