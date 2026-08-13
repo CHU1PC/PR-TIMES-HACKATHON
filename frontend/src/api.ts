@@ -8,7 +8,8 @@ import type {
   SparringTurn,
 } from "@/types";
 
-const rawBase: string = import.meta.env.VITE_API_BASE ?? "";
+// 開発時は Vite の /api プロキシを使い、ブラウザから別オリジンへ直接アクセスしない。
+const rawBase: string = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE ?? "");
 
 // dev は .env.local の http://localhost:8080 を指す。本番は空 = 同一オリジン
 const API_BASE = rawBase.replace(/\/+$/, "");

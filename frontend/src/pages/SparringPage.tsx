@@ -5,18 +5,21 @@ import { ChatLog } from "@/components/ChatLog";
 import { ReplyForm } from "@/components/ReplyForm";
 import { SlotChecklist } from "@/components/SlotChecklist";
 import { TurnStatus } from "@/components/TurnStatus";
+import { isValidDate } from "@/lib/date";
 import { newDraft, summaryRows } from "@/lib/draft";
 import { clearSparring, loadSparring, saveSparring, type ChatMessage, type SparringSession } from "@/lib/session";
 import { Link, navigate, useQueryParam } from "@/router";
 import type { SparringTurn } from "@/types";
 
-function freshSession(title: string): SparringSession {
-  return { title, draft: newDraft(title), messages: [], slots: [], question: null, hint: null, ready: false };
+function freshSession(title: string, startDate: string | null): SparringSession {
+  return { title, draft: newDraft(title, startDate), messages: [], slots: [], question: null, hint: null, ready: false };
 }
 
 export function SparringPage() {
   const titleParam = useQueryParam("title");
+  const dateParam = useQueryParam("date");
   const title = (titleParam ?? "").trim();
+  const startDate = isValidDate(dateParam) ? dateParam : null;
 
   const [session, setSession] = useState<SparringSession | null>(null);
   const [resumed, setResumed] = useState(false);
@@ -61,11 +64,11 @@ export function SparringPage() {
     if (!startedRef.current) {
       startedRef.current = true;
       const saved = loadSparring();
-      if (saved && saved.title === title) {
+      if (saved && saved.title === title && saved.draft.start_date === startDate) {
         setSession(saved);
         setResumed(true);
       } else {
-        const started = freshSession(title);
+        const started = freshSession(title, startDate);
         setSession(started);
         void send({ draft: started.draft, reply: "" }, started);
       }
@@ -74,7 +77,7 @@ export function SparringPage() {
       controllerRef.current?.abort();
       startedRef.current = false;
     };
-  }, [title, send]);
+  }, [title, startDate, send]);
 
   // 答え終わった往復だけを会話に積む。いま出ている質問は AskPanel が持つ
   const handleSend = (text: string) => {
@@ -98,7 +101,7 @@ export function SparringPage() {
 
   const handleRestart = () => {
     clearSparring();
-    const started = freshSession(title);
+    const started = freshSession(title, startDate);
     setSession(started);
     setResumed(false);
     void send({ draft: started.draft, reply: "" }, started);
@@ -153,7 +156,7 @@ export function SparringPage() {
             </button>
             <p className="ready__note">
               <Link to="/" className="entry__link">
-                別の予定を入れる
+                ホームに戻る
               </Link>
             </p>
           </section>

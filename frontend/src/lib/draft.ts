@@ -21,11 +21,11 @@ const VIDEO_TEXT = {
   no: "ありません",
 } as const satisfies Record<YesNo, string>;
 
-/** 壁打ちの初回に投げる空の内容。title だけ入れる。 */
-export function newDraft(title: string): PlanDraft {
+/** 壁打ちの初回に投げる空の内容。選択済みの日付があれば開始日に入れる。 */
+export function newDraft(title: string, startDate: string | null = null): PlanDraft {
   return {
     title,
-    start_date: null,
+    start_date: startDate,
     place: null,
     partner: [],
     people: null,
