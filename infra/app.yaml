@@ -548,10 +548,6 @@ Outputs:
     Description: CloudFront を通さずに切り分けるとき用. SG で CloudFront 以外は弾かれる
     Value: !GetAtt LoadBalancer.DNSName
 
-  MigrationTaskDefinitionArn:
-    Description: リビジョン付き. 今流したイメージで確実に起こすため family 名では渡さない
-    Value: !Ref MigrationTaskDefinition
-
   TaskSubnetIds:
     Value: !Join [",", [!Ref ExistingPublicSubnetId, !Ref PublicSubnetC]]
 

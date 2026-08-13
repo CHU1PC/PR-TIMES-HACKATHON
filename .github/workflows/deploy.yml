@@ -29,6 +29,7 @@ env:
   ROLES_STACK: prtimes-hackathon-roles
   WAF_STACK: prtimes-hackathon-waf
   APP_STACK: prtimes-hackathon-app
+  MIGRATE_FAMILY: prtimes-hackathon-2026summer-migrate
 
 jobs:
   check:
@@ -127,6 +128,56 @@ jobs:
           echo "web_acl=$acl" >> "$GITHUB_OUTPUT"
           echo "verify=$verify" >> "$GITHUB_OUTPUT"
 
+      # 新しいコードを載せる前に当てる。落ちればここで止まり, 本番は旧コード旧スキーマのまま残る
+      - name: マイグレーションを流す
+        env:
+          IMAGE: ${{ steps.image.outputs.uri }}
+        run: |
+          out() {
+            aws cloudformation describe-stacks --stack-name "$APP_STACK" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text 2>/dev/null
+          }
+          old=$(aws ecs describe-task-definition --task-definition "$MIGRATE_FAMILY" \
+            --query 'taskDefinition' --output json 2>/dev/null) || {
+            echo "初回デプロイ。スキーマは infra/README.md の手順で当てる"
+            exit 0
+          }
+          # 形は app.yaml が持つ。ここで差し替えるのは今積んだイメージだけ
+          spec=$(python3 -c '
+          import json, os, sys
+          d = json.load(sys.stdin)
+          for k in ("taskDefinitionArn", "revision", "status", "requiresAttributes",
+                    "compatibilities", "registeredAt", "registeredBy", "deregisteredAt"):
+              d.pop(k, None)
+          d["containerDefinitions"][0]["image"] = os.environ["IMAGE"]
+          print(json.dumps(d))' <<<"$old")
+          task_def=$(aws ecs register-task-definition --cli-input-json "$spec" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          cluster=$(out ClusterName)
+          task=$(aws ecs run-task \
+            --cluster "$cluster" \
+            --task-definition "$task_def" \
+            --launch-type FARGATE \
+            --network-configuration \
+              "awsvpcConfiguration={subnets=[$(out TaskSubnetIds)],securityGroups=[$(out TaskSecurityGroupId)],assignPublicIp=ENABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          if [ -z "$task" ] || [ "$task" = "None" ]; then
+            echo "::error::マイグレーションタスクを起動できなかった（配置失敗）"
+            exit 1
+          fi
+          aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task"
+
+          aws logs tail "$(out LogGroupName)" --since 15m \
+            --log-stream-name-prefix "migrate/migrate/${task##*/}" || true
+
+          code=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$code" != "0" ]; then
+            echo "::error::alembic upgrade head が終了コード $code で落ちた。新しいコードは載せない"
+            exit 1
+          fi
+
       - name: app スタックを流す
         run: |
           aws cloudformation deploy \
@@ -155,49 +206,13 @@ jobs:
             --query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' --output text \
             | while read -r key value; do
                 case "$key" in
-                  AppUrl)                    echo "app_url=$value" ;;
-                  FrontendBucketName)        echo "bucket=$value" ;;
-                  DistributionId)            echo "distribution=$value" ;;
-                  ClusterName)               echo "cluster=$value" ;;
-                  ServiceName)               echo "service=$value" ;;
-                  MigrationTaskDefinitionArn) echo "migrate_task=$value" ;;
-                  TaskSubnetIds)             echo "subnets=$value" ;;
-                  TaskSecurityGroupId)       echo "task_sg=$value" ;;
-                  LogGroupName)              echo "log_group=$value" ;;
+                  AppUrl)             echo "app_url=$value" ;;
+                  FrontendBucketName) echo "bucket=$value" ;;
+                  DistributionId)     echo "distribution=$value" ;;
+                  ClusterName)        echo "cluster=$value" ;;
+                  ServiceName)        echo "service=$value" ;;
                 esac
               done >> "$GITHUB_OUTPUT"
-
-      # 新しいコードを配る前にスキーマを合わせる。追加のみに保ち, 旧コードを壊さないこと
-      - name: マイグレーションを流す
-        env:
-          CLUSTER: ${{ steps.stack.outputs.cluster }}
-          TASK_DEF: ${{ steps.stack.outputs.migrate_task }}
-          SUBNETS: ${{ steps.stack.outputs.subnets }}
-          TASK_SG: ${{ steps.stack.outputs.task_sg }}
-          LOG_GROUP: ${{ steps.stack.outputs.log_group }}
-        run: |
-          task=$(aws ecs run-task \
-            --cluster "$CLUSTER" \
-            --task-definition "$TASK_DEF" \
-            --launch-type FARGATE \
-            --network-configuration \
-              "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$TASK_SG],assignPublicIp=ENABLED}" \
-            --query 'tasks[0].taskArn' --output text)
-          if [ -z "$task" ] || [ "$task" = "None" ]; then
-            echo "::error::マイグレーションタスクを起動できなかった（配置失敗）"
-            exit 1
-          fi
-          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task"
-
-          aws logs tail "$LOG_GROUP" --since 15m \
-            --log-stream-name-prefix "migrate/migrate/${task##*/}" || true
-
-          code=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task" \
-            --query 'tasks[0].containers[0].exitCode' --output text)
-          if [ "$code" != "0" ]; then
-            echo "::error::alembic upgrade head が終了コード $code で落ちた。サービスは入れ替えない"
-            exit 1
-          fi
 
       # 同じコミットを流し直すと change set が空になり, 新しいイメージでも入れ替わらない
       - name: サービスを必ず入れ替える
