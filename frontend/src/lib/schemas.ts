@@ -180,3 +180,40 @@ export const proposalRequestSchema = z.object({
   /** 壁打ちで埋めたイベント内容 */
   draft: planDraftSchema,
 });
+
+/** Google カレンダーの予定1件。キーは Google Calendar API の名前のまま */
+export const calendarEventSchema = z.object({
+  id: z.string(),
+  /** Google 側が空なら「(タイトルなし)」が入る */
+  title: z.string(),
+  /** 未設定なら空文字 */
+  description: z.string(),
+  /** 未設定なら空文字 */
+  location: z.string(),
+  /** RFC3339。終日の予定は YYYY-MM-DD */
+  start: z.string(),
+  /** RFC3339。終日の予定は YYYY-MM-DD */
+  end: z.string(),
+  /** Google カレンダーで開く先 */
+  htmlLink: z.string().nullable(),
+});
+
+/** 予定を引く期間。キーもサーバーに合わせて camelCase */
+export const calendarRangeSchema = z.object({
+  /** 取得開始時刻 (RFC3339) */
+  timeMin: z.string(),
+  /** 取得終了時刻 (RFC3339) */
+  timeMax: z.string(),
+});
+
+export const calendarStatusSchema = z.object({
+  /** Google と連携済みか */
+  connected: z.boolean(),
+});
+
+export const calendarEventsResponseSchema = z.object({
+  /** Google と連携済みか */
+  connected: z.boolean(),
+  /** 未連携なら空 */
+  events: z.array(calendarEventSchema),
+});

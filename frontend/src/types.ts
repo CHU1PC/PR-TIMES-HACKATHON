@@ -1,6 +1,10 @@
 import type { z } from "zod";
 
 import type {
+  calendarEventSchema,
+  calendarEventsResponseSchema,
+  calendarRangeSchema,
+  calendarStatusSchema,
   candidateSchema,
   exchangeSchema,
   hearingResponseSchema,
@@ -57,3 +61,12 @@ export type Suggestion = z.infer<typeof suggestionSchema>;
 export type ProposalResponse = z.infer<typeof proposalResponseSchema>;
 
 export type ProposalRequest = z.infer<typeof proposalRequestSchema>;
+
+/** Google カレンダーの予定1件。キーは Google Calendar API の名前のまま */
+export type CalendarEvent = z.infer<typeof calendarEventSchema>;
+
+export type CalendarRange = z.infer<typeof calendarRangeSchema>;
+
+export type CalendarStatus = z.infer<typeof calendarStatusSchema>;
+
+export type CalendarEventsResponse = z.infer<typeof calendarEventsResponseSchema>;
