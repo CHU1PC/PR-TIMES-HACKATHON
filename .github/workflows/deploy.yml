@@ -1,0 +1,185 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  workflow_dispatch:
+
+# 同じブランチのデプロイが重なるとタスク定義の世代が混ざるので直列にする
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC のトークン発行に要る
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_STACK: prtimes-hackathon-ecr
+  DB_STACK: prtimes-hackathon-db
+  APP_STACK: prtimes-hackathon-app
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: バックエンドの lint とテスト
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest -q
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: フロントの型検査
+        working-directory: frontend
+        run: |
+          bun install --frozen-lockfile
+          bunx tsc --noEmit
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ---------------------------------------------------------------------
+      # バックエンドのイメージ
+      # ---------------------------------------------------------------------
+      - name: ECR スタックを作る（無ければ）
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/ecr.yaml \
+            --stack-name "$ECR_STACK" \
+            --no-fail-on-empty-changeset
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: イメージをビルドして push
+        id: image
+        run: |
+          repo=$(aws cloudformation describe-stacks --stack-name "$ECR_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`RepositoryUri`].OutputValue' --output text)
+          uri="$repo:${GITHUB_SHA::12}"
+          # タスク定義が X86_64 なので, ランナーと同じ amd64 を明示して積む
+          docker build --platform linux/amd64 -t "$uri" backend/
+          docker push "$uri"
+          echo "uri=$uri" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------------
+      # インフラ
+      # ---------------------------------------------------------------------
+      - name: VPC に紐づく値を引く
+        id: net
+        env:
+          VPC_ID: ${{ secrets.VPC_ID }}
+        run: |
+          # CloudFront のエッジ IP レンジ. リージョンごとに ID が違うので名前で引く
+          pl=$(aws ec2 describe-managed-prefix-lists \
+            --filters Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing \
+            --query 'PrefixLists[0].PrefixListId' --output text)
+          # 新設するパブリックサブネットの既定経路を向ける先
+          igw=$(aws ec2 describe-internet-gateways \
+            --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+            --query 'InternetGateways[0].InternetGatewayId' --output text)
+          # コーパス DB の SG。app スタックはここへ「タスクから :5432」を1本足す
+          dbsg=$(aws cloudformation describe-stacks --stack-name "$DB_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`SecurityGroupId`].OutputValue' --output text)
+          echo "prefix_list=$pl" >> "$GITHUB_OUTPUT"
+          echo "igw=$igw" >> "$GITHUB_OUTPUT"
+          echo "db_sg=$dbsg" >> "$GITHUB_OUTPUT"
+
+      - name: app スタックを流す
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/app.yaml \
+            --stack-name "$APP_STACK" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              VpcId='${{ secrets.VPC_ID }}' \
+              ExistingPublicSubnetId='${{ secrets.PUBLIC_SUBNET_ID }}' \
+              InternetGatewayId='${{ steps.net.outputs.igw }}' \
+              CloudFrontPrefixListId='${{ steps.net.outputs.prefix_list }}' \
+              DbSecurityGroupId='${{ steps.net.outputs.db_sg }}' \
+              ImageUri='${{ steps.image.outputs.uri }}'
+
+      - name: スタックの出力を読む
+        id: stack
+        run: |
+          aws cloudformation describe-stacks --stack-name "$APP_STACK" \
+            --query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' --output text \
+            | while read -r key value; do
+                case "$key" in
+                  AppUrl)             echo "app_url=$value" ;;
+                  FrontendBucketName) echo "bucket=$value" ;;
+                  DistributionId)     echo "distribution=$value" ;;
+                esac
+              done >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------------
+      # フロント
+      # ---------------------------------------------------------------------
+      - uses: oven-sh/setup-bun@v2
+
+      - name: フロントをビルド
+        working-directory: frontend
+        # VITE_API_BASE は渡さない。CloudFront が /api/* を同じオリジンで回すので空でよい
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: S3 へ同期
+        env:
+          BUCKET: ${{ steps.stack.outputs.bucket }}
+        run: |
+          # 資産はファイル名にハッシュが付くので長く持たせ, index.html だけ毎回取りに行かせる
+          aws s3 sync frontend/dist "s3://$BUCKET" --delete \
+            --cache-control 'public,max-age=31536000,immutable' \
+            --exclude index.html
+          aws s3 cp frontend/dist/index.html "s3://$BUCKET/index.html" \
+            --cache-control 'no-cache'
+
+      - name: CloudFront のキャッシュを飛ばす
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id '${{ steps.stack.outputs.distribution }}' \
+            --paths '/*' >/dev/null
+
+      # ---------------------------------------------------------------------
+      # 確認
+      # ---------------------------------------------------------------------
+      - name: 疎通を確かめる
+        env:
+          APP_URL: ${{ steps.stack.outputs.app_url }}
+        run: |
+          # 初回作成直後はエッジへの伝搬待ちがあるので数回試す
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 10 "$APP_URL/api/health"; then
+              echo
+              echo "OK: $APP_URL"
+              echo "### デプロイ完了: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "まだ応答なし ($i/10). 15秒待つ"
+            sleep 15
+          done
+          echo "::error::$APP_URL/api/health が応答しない"
+          exit 1
