@@ -24,14 +24,22 @@ class CalendarEvent(BaseModel):
 
 
 class CalendarStatus(BaseModel):
-    """連携しているかどうか。"""
+    """ログインと連携の状況。"""
 
-    configured: bool = Field(description="この環境で連携機能が使えるか。false なら連携ボタンを出さない")
-    connected: bool = Field(description="Google と連携済みか")
+    signed_in: bool = Field(description="ログイン済みか。予定を引けるかはこれで決まる")
+    configured: bool = Field(description="この環境で Google 連携が使えるか。false なら連携ボタンを出さない")
+    connected: bool = Field(description="Google と連携済みか。デモでログインしただけなら false")
+    demo: bool = Field(description="Google なしのデモログインを開いているか。false ならボタンを出さない")
+
+
+class DemoLogin(BaseModel):
+    """デモでログインする人。名前だけで identity を作る。"""
+
+    name: str | None = Field(default=None, description="表示名。空なら既定の名前を使う")
 
 
 class CalendarEvents(BaseModel):
     """指定期間の予定。"""
 
-    connected: bool = Field(description="Google と連携済みか")
-    events: list[CalendarEvent] = Field(description="期間内の予定")
+    connected: bool = Field(description="Google と連携済みか。デモでログインしただけなら false")
+    events: list[CalendarEvent] = Field(description="期間内の予定。Google の分と自分で足した分の両方")

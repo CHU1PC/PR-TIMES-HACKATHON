@@ -1,15 +1,22 @@
+from datetime import datetime, timedelta, timezone
 from typing import Final
 from uuid import UUID
 
 from googleapiclient.discovery import Resource, build
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from app.auth.google import load_credentials
+from app.db.models import Event
 from app.schema.calendar import CalendarEvent
 
 MAX_EVENTS: Final = 250
 
 NO_TITLE: Final = "(タイトルなし)"
+
+# Postgres は timestamptz を UTC で返す。終日の日付を出すときは日本時間に戻してから切る
+JST: Final = timezone(timedelta(hours=9))
 
 
 async def service(db: AsyncSession, user_id: UUID) -> Resource | None:
@@ -30,13 +37,73 @@ async def service(db: AsyncSession, user_id: UUID) -> Resource | None:
     return build("calendar", "v3", credentials=credentials)
 
 
+def _stored(row: Event) -> CalendarEvent:
+    """DB の1件を API の型に移す。
+
+    Args:
+        row: events テーブルの1行。
+
+    Returns:
+        予定1件。
+    """
+    # 終日は日付だけにする。Google の終日予定と同じ形に揃える
+    if row.all_day:
+        starts_at = row.starts_at.astimezone(JST).date().isoformat()
+        ends_at = row.ends_at.astimezone(JST).date().isoformat()
+    else:
+        starts_at = row.starts_at.isoformat()
+        ends_at = row.ends_at.isoformat()
+
+    return CalendarEvent(
+        id=str(row.id),
+        title=row.title,
+        description=row.description,
+        location=row.location,
+        start=starts_at,
+        end=ends_at,
+        html_link=None,
+        status="confirmed",
+    )
+
+
+async def stored_events(
+    db: AsyncSession,
+    user_id: UUID,
+    time_min: str | None = None,
+    time_max: str | None = None,
+) -> list[CalendarEvent]:
+    """このアプリに登録された予定を引く。
+
+    Args:
+        db: データベースセッション。
+        user_id: 対象のユーザー。
+        time_min: 取得開始時刻 (RFC3339)。None なら絞らない。
+        time_max: 取得終了時刻 (RFC3339)。None なら絞らない。
+
+    Returns:
+        期間に入る予定の一覧。
+    """
+    query = select(Event).where(col(Event.user_id) == user_id)
+
+    # 期間の指定は Google と同じ RFC3339 で来る
+    if time_min:
+        query = query.where(col(Event.ends_at) >= datetime.fromisoformat(time_min))
+
+    if time_max:
+        query = query.where(col(Event.starts_at) <= datetime.fromisoformat(time_max))
+
+    rows = (await db.execute(query.order_by(col(Event.starts_at)))).scalars().all()
+
+    return [_stored(row) for row in rows]
+
+
 async def events(
     db: AsyncSession,
     user_id: UUID,
     time_min: str | None = None,
     time_max: str | None = None,
-) -> list[CalendarEvent] | None:
-    """そのユーザーの主カレンダーの予定を引く。
+) -> list[CalendarEvent]:
+    """そのユーザーの予定を引く。
 
     Args:
         db: データベースセッション。
@@ -45,12 +112,15 @@ async def events(
         time_max: 取得終了時刻 (RFC3339)。None なら指定しない。
 
     Returns:
-        予定の一覧。未連携なら None。
+        このアプリに登録された予定と, 連携していれば Google の予定を合わせたもの。
     """
+    stored = await stored_events(db, user_id, time_min, time_max)
+
     client = await service(db, user_id)
 
+    # 未連携でも自分で足した予定は返す
     if client is None:
-        return None
+        return stored
 
     params: dict[str, str | bool | int] = {
         "calendarId": "primary",
@@ -66,8 +136,9 @@ async def events(
         params["timeMax"] = time_max
 
     found = client.events().list(**params).execute()
+    fetched = [event for item in found.get("items", []) if (event := _event(item))]
 
-    return [event for item in found.get("items", []) if (event := _event(item))]
+    return sorted(stored + fetched, key=lambda event: event.start)
 
 
 def _event(item: dict) -> CalendarEvent | None:
