@@ -83,25 +83,8 @@ export function GoogleCalendar() {
     );
   }
 
-  if (status === null) {
-    return (
-      <section className="calendar">
-        <p className="state" role="status" aria-live="polite">
-          Googleカレンダーを確認しています…
-        </p>
-      </section>
-    );
-  }
-
-  // 環境変数が入っていない。押しても 503 になるので連携ボタンは出さない
-  if (!status.configured) {
-    return (
-      <section className="calendar">
-        <h2 className="calendar__title">Googleカレンダー</h2>
-        <p className="page__lead">この環境ではGoogleカレンダー連携を使えません。</p>
-      </section>
-    );
-  }
+  // 確認中と未設定は何も描かない。未設定は本番の既定なので, 出すと入口に説明の要る枠が居座る
+  if (status === null || !status.configured) return null;
 
   if (!status.connected) {
     return (
