@@ -31,6 +31,9 @@ test = [
     "pydantic-settings>=2.5",
 ]
 
+[tool.fastapi]
+entrypoint = "app.main:app"
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
