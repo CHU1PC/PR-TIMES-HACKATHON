@@ -120,6 +120,35 @@ uv run --group etl python -m etl.load_corpus
 
 **これをやらないと `/api/proposal` がテーブル未作成で 500 になる。**
 
+### 5. カレンダー連携を使うなら Google の値を置く（任意）
+
+使わないなら飛ばしてよい。置かないうちは `/api/calendar/status` が `configured: false` を返し、
+画面に連携の導線が出ないだけで、壁打ちも提案も動く。
+
+Google Cloud Console で OAuth クライアント（種別: ウェブアプリケーション）を作り、
+**承認済みのリダイレクト URI** に本番のものを登録する。
+
+```
+https://<CloudFront のドメイン>/api/calendar/oauth/callback
+```
+
+同意画面には `openid` / `userinfo.email` / `userinfo.profile` / `calendar.readonly` の4つを追加し、
+公開ステータスがテストなら使う人をテストユーザーに入れる。Google Calendar API の有効化も要る。
+
+得た2つを Parameter Store へ置く。**値は履歴に残さない。**
+
+```bash
+read -rs CID && aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
+  --name /prtimes-hackathon/google-client-id --type SecureString --overwrite --value "$CID"
+read -rs CSEC && aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
+  --name /prtimes-hackathon/google-client-secret --type SecureString --overwrite --value "$CSEC"
+unset CID CSEC
+```
+
+置くと**次のデプロイで自動的に有効になる**。CI がパラメータの有無を見て
+`GoogleCalendarEnabled` を決めるので、手で切り替える必要はない。
+リダイレクト URI と戻り先は CloudFront のドメインから組み立てられる。
+
 ### 5. GitHub に Secrets を3つ登録する
 
 ```bash

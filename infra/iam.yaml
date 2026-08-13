@@ -279,7 +279,7 @@ Resources:
 
           # CI はキーの値を使わない. タスク定義に ARN を書くために存在確認するだけ。
           # ssm:DescribeParameters は資源指定に対応せず必ず拒否されるので入れない
-          - Sid: ReadOpenAiKeyParameter
+          - Sid: ReadProjectParameters
             Effect: Allow
             Action: ssm:GetParameter
             Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/*"
