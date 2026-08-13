@@ -1,7 +1,16 @@
 import type { z } from "zod";
 
-import { hearingResponseSchema, proposalResponseSchema, sparringResponseSchema } from "@/lib/schemas";
+import {
+  calendarEventsResponseSchema,
+  calendarStatusSchema,
+  hearingResponseSchema,
+  proposalResponseSchema,
+  sparringResponseSchema,
+} from "@/lib/schemas";
 import type {
+  CalendarEventsResponse,
+  CalendarRange,
+  CalendarStatus,
   HearingResponse,
   HearingTurn,
   ProposalRequest,
@@ -48,9 +57,9 @@ function failureOf(error: unknown): ApiFailure {
   return { kind: "network", message: MESSAGES.network };
 }
 
-async function post<T>(
+async function request<T>(
   path: string,
-  body: unknown,
+  init: RequestInit,
   schema: z.ZodType<T>,
   signal?: AbortSignal,
   timeoutMs: number = TIMEOUT_MS,
@@ -59,12 +68,7 @@ async function post<T>(
   const timeout = AbortSignal.timeout(timeoutMs);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: combined,
-    });
+    const response = await fetch(`${API_BASE}${path}`, { ...init, signal: combined });
     if (!response.ok) return { ok: false, kind: "server", message: MESSAGES.server };
     const payload: unknown = await response.json();
     const parsed = schema.safeParse(payload);
@@ -73,6 +77,30 @@ async function post<T>(
   } catch (error) {
     return { ok: false, ...failureOf(error) };
   }
+}
+
+function post<T>(
+  path: string,
+  body: unknown,
+  schema: z.ZodType<T>,
+  signal?: AbortSignal,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<ApiResult<T>> {
+  const init: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
+  return request(path, init, schema, signal, timeoutMs);
+}
+
+function get<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  signal?: AbortSignal,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<ApiResult<T>> {
+  return request(path, { method: "GET" }, schema, signal, timeoutMs);
 }
 
 export function sparringStep(turn: SparringTurn, signal?: AbortSignal): Promise<ApiResult<SparringResponse>> {
@@ -85,4 +113,20 @@ export function hearingStep(turn: HearingTurn, signal?: AbortSignal): Promise<Ap
 
 export function fetchProposal(request: ProposalRequest, signal?: AbortSignal): Promise<ApiResult<ProposalResponse>> {
   return post<ProposalResponse>("/api/proposal", request, proposalResponseSchema, signal, PROPOSAL_TIMEOUT_MS);
+}
+
+export function calendarStatus(signal?: AbortSignal): Promise<ApiResult<CalendarStatus>> {
+  return get<CalendarStatus>("/api/calendar/status", calendarStatusSchema, signal);
+}
+
+export function calendarEvents(
+  range: CalendarRange,
+  signal?: AbortSignal,
+): Promise<ApiResult<CalendarEventsResponse>> {
+  return post<CalendarEventsResponse>("/api/calendar/events", range, calendarEventsResponseSchema, signal);
+}
+
+/** 連携はブラウザごと Google へ送るので, fetch せず遷移先だけ返す */
+export function calendarLoginUrl(): string {
+  return `${API_BASE}/api/calendar/login`;
 }
