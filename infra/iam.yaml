@@ -356,6 +356,7 @@ Resources:
               - rds:CreateDBSnapshot
               - rds:DeleteDBSnapshot
               - rds:DescribeDBSnapshots
+              - rds:RestoreDBInstanceFromDBSnapshot
               - rds:CreateDBSubnetGroup
               - rds:DeleteDBSubnetGroup
               - rds:DescribeDBSubnetGroups
