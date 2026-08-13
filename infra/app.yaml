@@ -84,6 +84,23 @@ Parameters:
     Default: /prtimes-hackathon/database-url
     Description: SecureString で置いたコーパス DB の接続 URL. 値はここには書かない
 
+  GoogleClientIdParameterName:
+    Type: String
+    Default: /prtimes-hackathon/google-client-id
+    Description: SecureString で置いた OAuth のクライアント ID. 値はここには書かない
+
+  GoogleClientSecretParameterName:
+    Type: String
+    Default: /prtimes-hackathon/google-client-secret
+    Description: SecureString で置いた OAuth のシークレット. 値はここには書かない
+
+  # 上の2本を Parameter Store に置くまでは false。true にして値が無いとタスクが起動できない
+  GoogleCalendarEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: カレンダー連携を有効にするか. CI がパラメータの有無を見て自動で決める
+
   TaskCpu:
     Type: String
     Default: "512"
@@ -417,12 +434,29 @@ Resources:
               Value: !Sub '["https://${Distribution.DomainName}"]'
             - Name: MALLOC_ARENA_MAX
               Value: "2"
+            # Console の「承認済みのリダイレクト URI」と完全一致していないと弾かれる
+            - Name: GOOGLE_REDIRECT_URI
+              Value: !Sub "https://${Distribution.DomainName}/api/calendar/oauth/callback"
+            - Name: FRONTEND_URL
+              Value: !Sub "https://${Distribution.DomainName}"
+            - Name: COOKIE_SECURE
+              Value: "true"
           Secrets:
             # 値はタスク起動時に Parameter Store から入る。ここにも CI にも平文は無い
             - Name: OPENAI_API_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
             - Name: DATABASE_URL
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
+            - !If
+              - WithGoogleCalendar
+              - Name: GOOGLE_CLIENT_ID
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientIdParameterName}"
+              - !Ref AWS::NoValue
+            - !If
+              - WithGoogleCalendar
+              - Name: GOOGLE_CLIENT_SECRET
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientSecretParameterName}"
+              - !Ref AWS::NoValue
           LogConfiguration:
             LogDriver: awslogs
             Options:

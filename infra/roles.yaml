@@ -14,6 +14,14 @@ Parameters:
     Type: String
     Default: /prtimes-hackathon/database-url
 
+  GoogleClientIdParameterName:
+    Type: String
+    Default: /prtimes-hackathon/google-client-id
+
+  GoogleClientSecretParameterName:
+    Type: String
+    Default: /prtimes-hackathon/google-client-secret
+
 Resources:
   # イメージの取得とキーの注入を行う。アプリのコードはこのロールを使わない
   ExecutionRole:
@@ -40,6 +48,8 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientIdParameterName}"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientSecretParameterName}"
 
               # AWS 管理鍵なら鍵ポリシー側で許可されるはずだが, 外れるとタスクが起動できない
               - Effect: Allow
