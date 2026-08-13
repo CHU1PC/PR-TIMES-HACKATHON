@@ -49,7 +49,7 @@ class SparringResponse(BaseModel):
     """1往復ぶんの応答。"""
 
     draft: PlanDraft = Field(description="返答を反映した後のイベント内容")
-    question: str | None = Field(default=None, description="次に聞くこと。全部済んだら None")
-    hint: str | None = Field(default=None, description="答えやすくするための例示")
+    question: str | None = Field(description="次に聞くこと。全部済んだら None")
+    hint: str | None = Field(description="答えやすくするための例示")
     slots: list[SlotState] = Field(description="チェックリスト。SLOT_ORDER の順に並ぶ")
     ready: bool = Field(description="出せる形になったか")
