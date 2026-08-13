@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { calendarLoginUrl, calendarStatus, demoLogin } from "@/api";
+import { calendarLoginUrl, calendarStatus, demoLogin, logout } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Link } from "@/router";
 import type { CalendarStatus } from "@/types";
@@ -39,6 +39,15 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
     setPending(false);
     // 予定はページ全体で読み直す必要があるので, 素直に入れ直す
     if (result.ok) window.location.assign("/");
+  };
+
+  const handleLogout = async () => {
+    if (pending) return;
+    setPending(true);
+    await logout();
+    setPending(false);
+    // 予定を持ったままの画面が残らないよう, 入口から読み直す
+    window.location.assign("/");
   };
 
   const signedIn = status?.signed_in === true;
@@ -84,6 +93,18 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
             <Icon name="calendar" size={19} />
             <span>Googleでログイン</span>
           </a>
+        ) : null}
+
+        {signedIn ? (
+          <button
+            type="button"
+            className="app-header__action app-header__action--secondary"
+            onClick={() => void handleLogout()}
+            disabled={pending}
+          >
+            <Icon name="arrow-right" size={19} />
+            <span>ログアウト</span>
+          </button>
         ) : null}
 
         {isEntry ? (

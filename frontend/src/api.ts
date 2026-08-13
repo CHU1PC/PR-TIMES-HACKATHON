@@ -165,6 +165,14 @@ export async function demoLogin(name: string, signal?: AbortSignal): Promise<Api
   return { ok: true, data: null };
 }
 
+/** セッションだけ切る。Google の資格情報は残るので, 入り直せばまた連携済みになる */
+export async function logout(signal?: AbortSignal): Promise<ApiResult<null>> {
+  const init: RequestInit = { ...WITH_SESSION, method: "POST" };
+  const sent = await send("/api/calendar/logout", init, signal, TIMEOUT_MS);
+  if (!sent.ok) return sent;
+  return { ok: true, data: null };
+}
+
 /** 資格情報を消して Google 側にも取り消しを伝える。204 なので本文は読まない */
 export async function calendarDisconnect(signal?: AbortSignal): Promise<ApiResult<null>> {
   const init: RequestInit = { ...WITH_SESSION, method: "DELETE" };
