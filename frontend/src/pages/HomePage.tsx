@@ -66,10 +66,13 @@ function buildCalendarDays(year: number, month: number): CalendarDay[] {
   });
 }
 
-function entryPath(eventDate: string, title?: string): string {
-  const params = new URLSearchParams({ date: eventDate });
-  if (title) params.set("title", title);
-  return `/entry?${params.toString()}`;
+/** 日付を押したらその日の画面へ。予定を選ぶのも足すのもそこでやる */
+function dayPath(eventDate: string): string {
+  return `/day?date=${encodeURIComponent(eventDate)}`;
+}
+
+function entryPath(eventDate: string, title: string): string {
+  return `/entry?date=${encodeURIComponent(eventDate)}&title=${encodeURIComponent(title)}`;
 }
 
 export function HomePage() {
@@ -227,7 +230,7 @@ export function HomePage() {
                       <td key={day.key} className={!day.isCurrentMonth ? "is-outside" : undefined}>
                         {/* 日付だけ渡す。その日に何件あってもどれを扱うかは入口の画面で選ぶ */}
                         <Link
-                          to={entryPath(day.key)}
+                          to={dayPath(day.key)}
                           className={`calendar-day${dayEvents.length > 0 ? " has-event" : ""}${day.isToday ? " is-today" : ""}`}
                           aria-label={`${formatDate(day.key)}を選択`}
                           aria-current={day.isToday ? "date" : undefined}

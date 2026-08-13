@@ -191,6 +191,47 @@
         "title": "DemoLogin",
         "type": "object"
       },
+      "EventCreate": {
+        "description": "画面から足す予定1件。時刻は RFC3339 で受ける。",
+        "properties": {
+          "allDay": {
+            "default": false,
+            "description": "終日の予定か",
+            "title": "Allday",
+            "type": "boolean"
+          },
+          "description": {
+            "default": "",
+            "description": "予定の詳細。無ければ空文字",
+            "title": "Description",
+            "type": "string"
+          },
+          "endsAt": {
+            "description": "終了 (RFC3339)",
+            "title": "Endsat",
+            "type": "string"
+          },
+          "startsAt": {
+            "description": "開始 (RFC3339)",
+            "title": "Startsat",
+            "type": "string"
+          },
+          "title": {
+            "description": "予定の件名",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "startsAt",
+          "endsAt"
+        ],
+        "title": "EventCreate",
+        "type": "object"
+      },
       "EventQuery": {
         "description": "予定を引く期間。キーは Google Calendar API の名前に合わせる。",
         "properties": {
@@ -1018,6 +1059,48 @@
           }
         },
         "summary": "Oauth Callback",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/plans": {
+      "post": {
+        "description": "このアプリに予定を1件足す。Google 側には書き込まない。\n\nArgs:\n    payload: 画面から来た内容。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    保存した予定。",
+        "operationId": "add_plan_api_calendar_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEvent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Plan",
         "tags": [
           "calendar"
         ]

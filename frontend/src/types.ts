@@ -6,6 +6,7 @@ import type {
   calendarStatusSchema,
   candidateSchema,
   demoLoginSchema,
+  eventCreateSchema,
   eventQuerySchema,
   exchangeSchema,
   hearingResponseSchema,
@@ -69,5 +70,8 @@ export type CalendarStatus = z.infer<typeof calendarStatusSchema>;
 
 /** デモでログインする人。名前だけ渡す */
 export type DemoLogin = z.infer<typeof demoLoginSchema>;
+
+/** 画面から足す予定1件 */
+export type EventCreate = z.infer<typeof eventCreateSchema>;
 
 export type CalendarEvents = z.infer<typeof calendarEventsSchema>;

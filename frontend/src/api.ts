@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import {
+  calendarEventSchema,
   calendarEventsSchema,
   calendarStatusSchema,
   hearingResponseSchema,
@@ -8,10 +9,12 @@ import {
   sparringResponseSchema,
 } from "@/lib/schemas";
 import type {
+  CalendarEvent,
   CalendarEvents,
   CalendarRange,
   CalendarStatus,
   DemoLogin,
+  EventCreate,
   HearingResponse,
   HearingTurn,
   ProposalRequest,
@@ -149,6 +152,17 @@ export function calendarEvents(range: CalendarRange, signal?: AbortSignal): Prom
 /** 連携はブラウザごと Google へ送るので, fetch せず遷移先だけ返す */
 export function calendarLoginUrl(): string {
   return `${API_BASE}/api/calendar/login`;
+}
+
+/** このアプリに予定を1件足す。Google 側には書き込まない */
+export function createPlan(plan: EventCreate, signal?: AbortSignal): Promise<ApiResult<CalendarEvent>> {
+  const init: RequestInit = {
+    ...WITH_SESSION,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(plan),
+  };
+  return request("/api/calendar/plans", init, calendarEventSchema, signal);
 }
 
 /** 名前だけでログインする。初めての名前ならサーバーがデモの予定を積む。204 なので本文は読まない */
