@@ -6,6 +6,7 @@ import numpy as np
 from loguru import logger
 from openai import APIError, AsyncOpenAI, RateLimitError
 
+from app.llm.embeddings import DIMENSIONS, normalize
 from app.settings import DATA_DIR, settings
 
 CORPUS = DATA_DIR / "corpus.parquet"
@@ -14,9 +15,8 @@ OUT = DATA_DIR / "corpus_vec.npy"
 # バッチ単位で書き出す。1バッチの失敗で全件を捨てないための中間置き場（実測: 5分ぶんを失った）
 SHARDS = DATA_DIR / "embed_shards"
 
-# 1536次元は 129,045件で 793MB になりコンテナに載らない。256次元なら 132MB で精度低下も小さい
+# 次元とモデルは app/llm/embeddings.py と揃える。ずれると検索側と噛み合わない
 MODEL = "text-embedding-3-small"
-DIMENSIONS = 256
 
 # 1リクエストの入力上限は 300k トークン。本文冒頭込みで1件約1,086文字 = 概ね 1,000トークンなので
 # 1000件では溢れる。日本語は1文字1トークンを超えることがあるため 200 件に落として余裕を持たせる
@@ -113,8 +113,8 @@ async def embed_all(texts: list[str]) -> np.ndarray:
         shard = np.load(SHARDS / f"{index:07d}.npy")
         vectors[index : index + len(shard)] = shard
 
-    # コサイン類似度を内積1回で計算できるようにしておく
-    return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+    # コサイン類似度を内積1回で計算できるようにしておく。shard 欠損は NaN で流さず落とす
+    return normalize(vectors)
 
 
 async def main() -> None:
