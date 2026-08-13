@@ -1,17 +1,17 @@
-import { useMemo, useState } from "react";
-import { Icon, type IconName } from "@/components/Icon";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { calendarEvents, calendarLoginUrl, calendarStatus } from "@/api";
+import { Icon } from "@/components/Icon";
 import { formatDate } from "@/lib/date";
 import { Link } from "@/router";
+import type { CalendarEvent, CalendarStatus } from "@/types";
 
-type EventTone = "blue" | "green" | "orange" | "purple";
-
-interface CalendarEvent {
+/** 日セルとランキングに出す1件。Google の予定を画面用に均したもの */
+interface DayEvent {
   id: string;
+  /** YYYY-MM-DD */
   date: string;
   title: string;
   description: string;
-  tone: EventTone;
-  icon: IconName;
 }
 
 interface CalendarDay {
@@ -23,56 +23,29 @@ interface CalendarDay {
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
-const events: CalendarEvent[] = [
-  {
-    id: "conference",
-    date: "2026-08-20",
-    title: "カンファレンス開催",
-    description: "最新テクノロジーをテーマにしたカンファレンスを開催。業界の注目が集まる企画です。",
-    tone: "purple",
-    icon: "message",
-  },
-  {
-    id: "product",
-    date: "2026-08-05",
-    title: "新商品発表会",
-    description: "新商品の特徴と利用シーンを発表し、ユーザーへ魅力を分かりやすく伝えます。",
-    tone: "purple",
-    icon: "sparkles",
-  },
-  {
-    id: "exhibition",
-    date: "2026-08-10",
-    title: "展示会出展",
-    description: "主要展示会へ出展し、幅広い業界関係者との新しい接点を作ります。",
-    tone: "green",
-    icon: "ranking",
-  },
-  {
-    id: "campaign",
-    date: "2026-08-25",
-    title: "キャンペーン開始",
-    description: "期間限定キャンペーンの開始を知らせ、内容と期間を明確に伝えます。",
-    tone: "orange",
-    icon: "sparkles",
-  },
-  {
-    id: "release",
-    date: "2026-08-15",
-    title: "プレスリリース配信",
-    description: "新たな取り組みや実績について、プレスリリースを配信します。",
-    tone: "blue",
-    icon: "message",
-  },
-];
-
-const eventsByDate = new Map(events.map((event) => [event.date, event]));
+// 1日に何件も入りうる。セルに出すのはここまでで, 残りは件数だけ添える
+const EVENTS_PER_DAY = 2;
 
 function toDateKey(date: Date): string {
   const year = String(date.getFullYear());
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/** 終日の予定は YYYY-MM-DD で来る。時刻付きだけ地域時間の日付に直す */
+function startDateKey(start: string): string {
+  if (start.length === 10) return start;
+  return toDateKey(new Date(start));
+}
+
+function toDayEvent(event: CalendarEvent): DayEvent {
+  return {
+    id: event.id,
+    date: startDateKey(event.start),
+    title: event.title,
+    description: event.description,
+  };
 }
 
 function buildCalendarDays(year: number, month: number): CalendarDay[] {
@@ -102,6 +75,11 @@ function entryPath(eventDate: string, title?: string): string {
 export function HomePage() {
   const now = new Date();
   const [visibleMonth, setVisibleMonth] = useState(() => ({ year: now.getFullYear(), month: now.getMonth() }));
+  const [status, setStatus] = useState<CalendarStatus | null>(null);
+  const [events, setEvents] = useState<DayEvent[]>([]);
+
+  const controllerRef = useRef<AbortController | null>(null);
+
   const calendarDays = useMemo(
     () => buildCalendarDays(visibleMonth.year, visibleMonth.month),
     [visibleMonth.year, visibleMonth.month],
@@ -111,11 +89,64 @@ export function HomePage() {
     [calendarDays],
   );
   const monthLabel = `${String(visibleMonth.year)}年${String(visibleMonth.month + 1)}月`;
+
+  const load = useCallback(async (year: number, month: number) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    const current = await calendarStatus(controller.signal);
+    if (controller.signal.aborted) return;
+    if (!current.ok) return;
+    setStatus(current.data);
+
+    // 未連携・未設定は予定を出さない。空のカレンダーだけ残す
+    if (!current.data.configured || !current.data.connected) {
+      setEvents([]);
+      return;
+    }
+
+    // 前後の月にはみ出す日も枠に出るので, 見えている42日ぶんを引く
+    const gridStart = new Date(year, month, 1, 12, 0, 0);
+    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+    const gridEnd = new Date(gridStart);
+    gridEnd.setDate(gridStart.getDate() + 42);
+
+    const result = await calendarEvents(
+      { timeMin: gridStart.toISOString(), timeMax: gridEnd.toISOString() },
+      controller.signal,
+    );
+    if (controller.signal.aborted) return;
+    if (!result.ok) {
+      if (result.kind === "unauthorized") setStatus({ ...current.data, connected: false });
+      setEvents([]);
+      return;
+    }
+    setEvents(result.data.events.map(toDayEvent));
+  }, []);
+
+  useEffect(() => {
+    void load(visibleMonth.year, visibleMonth.month);
+
+    return () => {
+      controllerRef.current?.abort();
+    };
+  }, [load, visibleMonth.year, visibleMonth.month]);
+
+  const eventsByDate = useMemo(() => {
+    const grouped = new Map<string, DayEvent[]>();
+    for (const event of events) {
+      const sameDay = grouped.get(event.date);
+      if (sameDay) sameDay.push(event);
+      else grouped.set(event.date, [event]);
+    }
+    return grouped;
+  }, [events]);
+
   const monthlyRankedEvents = useMemo(() => {
     const monthPrefix = `${String(visibleMonth.year)}-${String(visibleMonth.month + 1).padStart(2, "0")}-`;
-    return events
-      .filter((event) => event.date.startsWith(monthPrefix));
-  }, [visibleMonth.year, visibleMonth.month]);
+    return events.filter((event) => event.date.startsWith(monthPrefix));
+  }, [events, visibleMonth.year, visibleMonth.month]);
 
   const moveMonth = (amount: number) => {
     setVisibleMonth((current) => {
@@ -147,7 +178,13 @@ export function HomePage() {
             <p className="section-heading__kicker">SCHEDULE</p>
             <h2 id="calendar-title" className="calendar-card__title">カレンダー</h2>
           </div>
-          <p>日付を選択すると、PRネタの作成を始められます。</p>
+          {status?.configured && !status.connected ? (
+            <a href={calendarLoginUrl()} className="button button--small">
+              Googleカレンダーと連携する
+            </a>
+          ) : (
+            <p>日付を選択すると、PRネタの作成を始められます。</p>
+          )}
         </div>
 
         <div className="calendar-toolbar">
@@ -187,28 +224,32 @@ export function HomePage() {
               {weeks.map((week, weekIndex) => (
                 <tr key={`week-${String(weekIndex)}`}>
                   {week.map((day, weekdayIndex) => {
-                    const event = eventsByDate.get(day.key);
+                    const dayEvents = eventsByDate.get(day.key) ?? [];
+                    const shown = dayEvents.slice(0, EVENTS_PER_DAY);
+                    const hidden = dayEvents.length - shown.length;
+                    const leadEvent = shown[0];
                     const dayContent = (
                       <>
                         <span className={`calendar-day__number${weekdayIndex === 0 ? " is-sunday" : weekdayIndex === 6 ? " is-saturday" : ""}`}>
                           {day.date.getDate()}
                         </span>
-                        {event ? (
-                          <span className={`calendar-event calendar-event--${event.tone}`}>
+                        {shown.map((event) => (
+                          <span key={event.id} className="calendar-event calendar-event--blue">
                             <span aria-hidden="true" />
                             <span className="calendar-event__title">{event.title}</span>
                             <span className="calendar-event__compact" aria-hidden="true">予定</span>
                           </span>
-                        ) : null}
+                        ))}
+                        {hidden > 0 ? <span className="calendar-event__more">ほか{hidden}件</span> : null}
                       </>
                     );
                     return (
                       <td key={day.key} className={!day.isCurrentMonth ? "is-outside" : undefined}>
-                        {event ? (
+                        {leadEvent ? (
                           <Link
-                            to={entryPath(day.key, event.title)}
+                            to={entryPath(day.key, leadEvent.title)}
                             className={`calendar-day has-event${day.isToday ? " is-today" : ""}`}
-                            aria-label={`${formatDate(day.key)}、${event.title}を選択`}
+                            aria-label={`${formatDate(day.key)}、${leadEvent.title}を選択`}
                             aria-current={day.isToday ? "date" : undefined}
                           >
                             {dayContent}
@@ -242,8 +283,8 @@ export function HomePage() {
             <li key={event.id} className="ranking-list__row">
               <Link to={entryPath(event.date, event.title)} className="ranking-item" aria-label={`${event.title}でPRネタを作る`}>
                 <span className={`ranking-item__rank ranking-item__rank--${String(index + 1)}`}>{index + 1}</span>
-                <span className={`ranking-item__visual ranking-item__visual--${event.tone}`}>
-                  <Icon name={event.icon} size={27} />
+                <span className="ranking-item__visual ranking-item__visual--blue">
+                  <Icon name="calendar" size={27} />
                 </span>
                 <div className="ranking-item__content">
                   <div className="ranking-item__title-line">

@@ -796,6 +796,14 @@ textarea:focus-visible {
   -webkit-line-clamp: 2;
 }
 
+.calendar-event__more {
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.45;
+  margin-top: 3px;
+  padding-left: 5px;
+}
+
 .calendar-event__compact {
   display: none;
 }
