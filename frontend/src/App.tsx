@@ -22,7 +22,7 @@ function NotFound() {
 }
 
 export default function App() {
-  const { path, search, hash } = useRouteLocation();
+  const { path, search } = useRouteLocation();
 
   let page: ReactNode = <NotFound />;
   if (path === "/" || path === "") page = <HomePage />;
@@ -33,7 +33,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <AppSidebar currentPath={path} currentHash={hash} />
+      <AppSidebar currentPath={path} />
       <div className="app__body">
         <AppHeader currentPath={path} />
         <main className="app-main">{page}</main>

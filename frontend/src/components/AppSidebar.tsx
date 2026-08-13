@@ -3,34 +3,22 @@ import { Link } from "@/router";
 
 interface AppSidebarProps {
   currentPath: string;
-  currentHash: string;
 }
 
 interface NavigationItem {
   label: string;
   path: string;
   icon: IconName;
-  isActive: (path: string, hash: string) => boolean;
+  isActive: (path: string) => boolean;
 }
 
+// ホームがカレンダーもランキングも並べて出すので, 同じ画面への項目は増やさない
 const navigationItems: NavigationItem[] = [
   {
     label: "ホーム",
     path: "/",
     icon: "home",
-    isActive: (path, hash) => (path === "/" || path === "") && hash !== "#calendar" && hash !== "#ranking",
-  },
-  {
-    label: "カレンダー",
-    path: "/#calendar",
-    icon: "calendar",
-    isActive: (path, hash) => (path === "/" || path === "") && hash === "#calendar",
-  },
-  {
-    label: "ランキング",
-    path: "/#ranking",
-    icon: "ranking",
-    isActive: (path, hash) => (path === "/" || path === "") && hash === "#ranking",
+    isActive: (path) => path === "/" || path === "",
   },
   {
     label: "予定を探す",
@@ -40,7 +28,7 @@ const navigationItems: NavigationItem[] = [
   },
 ];
 
-export function AppSidebar({ currentPath, currentHash }: AppSidebarProps) {
+export function AppSidebar({ currentPath }: AppSidebarProps) {
   return (
     <aside className="app-sidebar" aria-label="アプリナビゲーション">
       <Link to="/" className="app-sidebar__brand" aria-label="PR Generator ホーム">
@@ -52,8 +40,8 @@ export function AppSidebar({ currentPath, currentHash }: AppSidebarProps) {
         <p className="app-sidebar__nav-label">メニュー</p>
         <ul className="app-sidebar__nav-list">
           {navigationItems.map((item) => {
-            const active = item.isActive(currentPath, currentHash);
-            const ariaCurrent = active ? (item.path.includes("#") ? "location" : "page") : undefined;
+            const active = item.isActive(currentPath);
+            const ariaCurrent = active ? "page" : undefined;
             return (
               <li key={item.path}>
                 <Link to={item.path} className={`app-sidebar__nav-item${active ? " is-active" : ""}`} aria-current={ariaCurrent}>
