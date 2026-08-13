@@ -137,12 +137,26 @@ https://<CloudFront のドメイン>/api/calendar/oauth/callback
 
 得た2つを Parameter Store へ置く。**値は履歴に残さない。**
 
+`read -s` なので入力は画面に出ず、履歴にも値は残らない（zsh の書き方）。
+
 ```bash
-read -rs CID && aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
+read -rs "CID?client id: " && echo && \
+aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
   --name /prtimes-hackathon/google-client-id --type SecureString --overwrite --value "$CID"
-read -rs CSEC && aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
+
+read -rs "CSEC?client secret: " && echo && \
+aws ssm put-parameter --profile prtimes --region ap-northeast-1 \
   --name /prtimes-hackathon/google-client-secret --type SecureString --overwrite --value "$CSEC"
+
 unset CID CSEC
+```
+
+置けたかは名前だけで確かめる。値は取り出さない。
+
+```bash
+aws ssm describe-parameters --profile prtimes --region ap-northeast-1 \
+  --parameter-filters "Key=Name,Option=BeginsWith,Values=/prtimes-hackathon/google" \
+  --query 'Parameters[].[Name,Type]' --output table
 ```
 
 置くと**次のデプロイで自動的に有効になる**。CI がパラメータの有無を見て
