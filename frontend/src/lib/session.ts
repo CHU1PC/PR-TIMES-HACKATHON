@@ -1,98 +1,61 @@
-import {
-  isCandidate,
-  isExchange,
-  isPlanDraft,
-  isRecord,
-  isSlotState,
-  isTextOrNull,
-} from "@/lib/guards";
-import type { Candidate, Exchange, PlanDraft, SlotState } from "@/types";
+import { z } from "zod";
 
-export interface ChatMessage {
+import { candidateSchema, exchangeSchema, planDraftSchema, slotStateSchema } from "@/lib/schemas";
+
+export const chatMessageSchema = z.object({
   /** ai はサーバーの質問、you は顧客の返答 */
-  role: "ai" | "you";
+  role: z.enum(["ai", "you"]),
   /** 画面に出す文言 */
-  text: string;
-}
+  text: z.string(),
+});
 
-export interface SparringSession {
+export const sparringSessionSchema = z.object({
   /** 入口で入力された予定。復元先を取り違えないための鍵にもする */
-  title: string;
+  title: z.string(),
   /** サーバーに送り返す現在のイベント内容 */
-  draft: PlanDraft;
+  draft: planDraftSchema,
   /** 画面に出す会話の記録。サーバーは保持しない */
-  messages: ChatMessage[];
+  messages: z.array(chatMessageSchema),
   /** チェックリスト */
-  slots: SlotState[];
+  slots: z.array(slotStateSchema),
   /** いま出ている質問 */
-  question: string | null;
+  question: z.string().nullable(),
   /** いま出ている例示 */
-  hint: string | null;
+  hint: z.string().nullable(),
   /** 出せる形になったか */
-  ready: boolean;
-}
+  ready: z.boolean(),
+});
 
-export interface HearingSession {
+export const hearingSessionSchema = z.object({
   /** サーバーに送り返す往復履歴 */
-  history: Exchange[];
+  history: z.array(exchangeSchema),
   /** 画面に出す会話の記録。サーバーは保持しない */
-  messages: ChatMessage[];
+  messages: z.array(chatMessageSchema),
   /** いま出ている質問 */
-  question: string | null;
+  question: z.string().nullable(),
   /** いま出ている例示 */
-  hint: string | null;
+  hint: z.string().nullable(),
   /** 見つかった予定候補 */
-  candidates: Candidate[];
+  candidates: z.array(candidateSchema),
   /** 聞き終わったか */
-  done: boolean;
-}
+  done: z.boolean(),
+});
+
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+export type SparringSession = z.infer<typeof sparringSessionSchema>;
+
+export type HearingSession = z.infer<typeof hearingSessionSchema>;
 
 const SPARRING_KEY = "prtimes.sparring";
 const HEARING_KEY = "prtimes.hearing";
 
-function isChatMessage(value: unknown): value is ChatMessage {
-  if (!isRecord(value)) return false;
-  return (value.role === "ai" || value.role === "you") && typeof value.text === "string";
-}
-
-
-
-function isSparringSession(value: unknown): value is SparringSession {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.title === "string" &&
-    isPlanDraft(value.draft) &&
-    Array.isArray(value.messages) &&
-    value.messages.every(isChatMessage) &&
-    Array.isArray(value.slots) &&
-    value.slots.every(isSlotState) &&
-    isTextOrNull(value.question) &&
-    isTextOrNull(value.hint) &&
-    typeof value.ready === "boolean"
-  );
-}
-
-function isHearingSession(value: unknown): value is HearingSession {
-  if (!isRecord(value)) return false;
-  return (
-    Array.isArray(value.history) &&
-    value.history.every(isExchange) &&
-    Array.isArray(value.messages) &&
-    value.messages.every(isChatMessage) &&
-    isTextOrNull(value.question) &&
-    isTextOrNull(value.hint) &&
-    Array.isArray(value.candidates) &&
-    value.candidates.every(isCandidate) &&
-    typeof value.done === "boolean"
-  );
-}
-
-function read<T>(key: string, guard: (value: unknown) => value is T): T | null {
+function read<T>(key: string, schema: z.ZodType<T>): T | null {
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return guard(parsed) ? parsed : null;
+    const parsed = schema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
@@ -115,7 +78,7 @@ function remove(key: string): void {
 }
 
 export function loadSparring(): SparringSession | null {
-  return read(SPARRING_KEY, isSparringSession);
+  return read(SPARRING_KEY, sparringSessionSchema);
 }
 
 export function saveSparring(session: SparringSession): void {
@@ -127,7 +90,7 @@ export function clearSparring(): void {
 }
 
 export function loadHearing(): HearingSession | null {
-  return read(HEARING_KEY, isHearingSession);
+  return read(HEARING_KEY, hearingSessionSchema);
 }
 
 export function saveHearing(session: HearingSession): void {

@@ -1,160 +1,59 @@
-export type SlotCode = "place" | "partner" | "people" | "novelty" | "observation" | "video";
+import type { z } from "zod";
 
-export type PlanCategory =
-  | "販売・提供の開始/拡大"
-  | "提携・連携の開始"
-  | "場所・チャネルの追加"
-  | "商品・サービスの改訂"
-  | "人・組織の変化"
-  | "受賞・認定"
-  | "数字の節目"
-  | "外部イベント出展";
+import type {
+  candidateSchema,
+  exchangeSchema,
+  hearingResponseSchema,
+  hearingTurnSchema,
+  planCategorySchema,
+  planDraftSchema,
+  presenceSchema,
+  proposalCaseSchema,
+  proposalRequestSchema,
+  proposalResponseSchema,
+  slotCodeSchema,
+  slotStateSchema,
+  sparringResponseSchema,
+  sparringTurnSchema,
+  suggestionSchema,
+  toneSchema,
+  yesNoSchema,
+} from "@/lib/schemas";
+
+export type SlotCode = z.infer<typeof slotCodeSchema>;
+
+export type PlanCategory = z.infer<typeof planCategorySchema>;
 
 /** 当日その場に人がいるか。null は「まだ聞いていない」 */
-export type Presence = "yes" | "no" | "unknown";
+export type Presence = z.infer<typeof presenceSchema>;
 
 /** すでにある動画の有無。null は「まだ聞いていない」 */
-export type YesNo = "yes" | "no";
+export type YesNo = z.infer<typeof yesNoSchema>;
 
 /** causal は判定クエリC を通ったスロットのみ */
-export type Tone = "causal" | "functional";
+export type Tone = z.infer<typeof toneSchema>;
 
-export interface PlanDraft {
-  /** これからやることを1行で */
-  title: string;
-  /** 開始日 YYYY-MM-DD。未定なら null */
-  start_date: string | null;
-  /** 市区町村または都道府県。オンライン可 */
-  place: string | null;
-  /** 社外で関わる相手の名前 */
-  partner: string[];
-  /** 当日その場に人がいるか */
-  people: Presence | null;
-  /** 御社として初めてのこと */
-  novelty: string | null;
-  /** 当日見聞きできそうなこと */
-  observation: string | null;
-  /** すでにある動画の有無 */
-  video: YesNo | null;
-  /** 聞いたが該当が無かった項目 */
-  skipped: SlotCode[];
-  /** 読み取れず聞き直した項目 */
-  retried: SlotCode[];
-}
+export type PlanDraft = z.infer<typeof planDraftSchema>;
 
-export interface SparringTurn {
-  /** いま分かっているイベント内容 */
-  draft: PlanDraft;
-  /** 直前の質問への顧客の返答。初回は空 */
-  reply: string;
-}
+export type SparringTurn = z.infer<typeof sparringTurnSchema>;
 
-export interface SlotState {
-  /** スロット識別子 */
-  code: SlotCode;
-  /** 顧客に見せる質問文 */
-  label: string;
-  /** 値が入っているか */
-  filled: boolean;
-  /** 聞いたが該当が無かったか */
-  skipped: boolean;
-  /** 埋まると何が起きるか。サーバーの文言をそのまま出す */
-  effect: string;
-  /** causal は判定クエリC を通ったスロットのみ */
-  tone: Tone;
-}
+export type SlotState = z.infer<typeof slotStateSchema>;
 
-export interface SparringResponse {
-  /** 返答を反映した後のイベント内容 */
-  draft: PlanDraft;
-  /** 次に聞くこと。全部済んだら null */
-  question: string | null;
-  /** 答えやすくするための例示 */
-  hint: string | null;
-  /** チェックリスト。サーバーが決めた順に並ぶ */
-  slots: SlotState[];
-  /** 出せる形になったか */
-  ready: boolean;
-}
+export type SparringResponse = z.infer<typeof sparringResponseSchema>;
 
-export interface Exchange {
-  /** こちらが聞いたこと */
-  question: string;
-  /** 相手の返答。まだ答えていなければ空 */
-  answer: string;
-}
+export type Exchange = z.infer<typeof exchangeSchema>;
 
-export interface HearingTurn {
-  /** ここまでの往復。初回は空 */
-  history: Exchange[];
-  /** 直前の質問への返答。初回は空 */
-  answer: string;
-}
+export type HearingTurn = z.infer<typeof hearingTurnSchema>;
 
-export interface Candidate {
-  /** 予定として登録する一文 */
-  title: string;
-  /** requirements §6.2 の8分類 */
-  category: PlanCategory;
-  /** 根拠になった回答の引用 */
-  source: string;
-  /** なぜ発信できるかを1行で */
-  reason: string;
-}
+export type Candidate = z.infer<typeof candidateSchema>;
 
-export interface HearingResponse {
-  /** 返答を追加した後の往復履歴 */
-  history: Exchange[];
-  /** 次に聞くこと。聞き終わったら null */
-  question: string | null;
-  /** 答えやすくするための例示 */
-  hint: string | null;
-  /** ここまでに見つかった予定候補 */
-  candidates: Candidate[];
-  /** 聞き終わったか */
-  done: boolean;
-}
+export type HearingResponse = z.infer<typeof hearingResponseSchema>;
 
 /** 提案の根拠にした過去のリリース1件。転載件数はサーバーが応答に載せない */
-export interface ProposalCase {
-  /** PR TIMES 側の企業ID */
-  company_id: number;
-  /** 企業内でのリリースID。企業をまたぐと重複するので単独では使わない */
-  release_id: number;
-  title: string;
-  subtitle: string;
-  /** 本文冒頭をHTML除去して1000文字 */
-  body_head: string;
-  company_name: string | null;
-  business_category: string | null;
-  release_type: string | null;
-  prefecture: string | null;
-  city: string | null;
-  /** 配信日 YYYY-MM-DD */
-  published_on: string;
-  /** この事例を拾った媒体のうち特徴的なもの */
-  media: string[];
-}
+export type ProposalCase = z.infer<typeof proposalCaseSchema>;
 
-export interface Suggestion {
-  /** この取り組みに足せること */
-  action: string;
-  /** 事例のどこから言えるのか */
-  reason: string;
-  /** 根拠にした事例。cases 配列の0始まりの添字 */
-  cited: number[];
-}
+export type Suggestion = z.infer<typeof suggestionSchema>;
 
-export interface ProposalResponse {
-  /** 足せること */
-  suggestions: Suggestion[];
-  /** 根拠にした事例 */
-  cases: ProposalCase[];
-  /** 事例群を拾っていた媒体のうち特徴的なもの */
-  media: string[];
-}
+export type ProposalResponse = z.infer<typeof proposalResponseSchema>;
 
-export interface ProposalRequest {
-  /** 壁打ちで埋めたイベント内容 */
-  draft: PlanDraft;
-}
+export type ProposalRequest = z.infer<typeof proposalRequestSchema>;
