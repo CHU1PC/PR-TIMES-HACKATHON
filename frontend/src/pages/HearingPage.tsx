@@ -6,18 +6,22 @@ import { ReplyForm } from "@/components/ReplyForm";
 import { TurnStatus } from "@/components/TurnStatus";
 import { clearHearing, loadHearing, saveHearing, type ChatMessage, type HearingSession } from "@/lib/session";
 import { navigate } from "@/router";
-import type { Exchange, HearingTurn } from "@/types";
+import type { HearingTurn } from "@/types";
 
-const EMPTY_SESSION: HearingSession = { history: [], question: null, hint: null, candidates: [], done: false };
+const EMPTY_SESSION: HearingSession = {
+  history: [],
+  messages: [],
+  question: null,
+  hint: null,
+  candidates: [],
+  done: false,
+};
 
-/** 返答済みの往復だけを会話として出す。答えが空の末尾は「いま出ている質問」なので除く。 */
-function toMessages(history: Exchange[]): ChatMessage[] {
-  return history
-    .filter((exchange) => exchange.answer !== "")
-    .flatMap((exchange): ChatMessage[] => [
-      { role: "ai", text: exchange.question },
-      { role: "you", text: exchange.answer },
-    ]);
+/** 候補一覧は live region の外なので、聞き終わりを TurnStatus に読ませる。 */
+function doneMessage(session: HearingSession): string | null {
+  if (!session.done) return null;
+  if (session.candidates.length === 0) return "聞き取りが終わりました。今回は候補が見つかりませんでした。";
+  return `聞き取りが終わりました。出せそうな予定が${String(session.candidates.length)}件あります。`;
 }
 
 export function HearingPage() {
@@ -30,7 +34,7 @@ export function HearingPage() {
   const lastTurnRef = useRef<HearingTurn | null>(null);
   const startedRef = useRef(false);
 
-  const send = useCallback(async (turn: HearingTurn) => {
+  const send = useCallback(async (turn: HearingTurn, base: HearingSession) => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -51,7 +55,7 @@ export function HearingPage() {
     }
 
     const { history, question, hint, candidates, done } = result.data;
-    const next: HearingSession = { history, question, hint, candidates, done };
+    const next: HearingSession = { history, messages: base.messages, question, hint, candidates, done };
     setSession(next);
     saveHearing(next);
   }, []);
@@ -65,7 +69,7 @@ export function HearingPage() {
         setResumed(true);
       } else {
         setSession(EMPTY_SESSION);
-        void send({ history: [], answer: "" });
+        void send({ history: [], answer: "" }, EMPTY_SESSION);
       }
     }
     return () => {
@@ -74,23 +78,31 @@ export function HearingPage() {
     };
   }, [send]);
 
+  // 答え終わった往復だけを会話に積む。いま出ている質問は AskPanel が持つ
   const handleSend = (text: string) => {
     if (!session || !session.question || pending) return;
+    const answered: ChatMessage[] = [
+      { role: "ai", text: session.question },
+      { role: "you", text },
+    ];
+    const echoed: HearingSession = { ...session, messages: [...session.messages, ...answered] };
     setResumed(false);
-    void send({ history: session.history, answer: text });
+    setSession(echoed);
+    saveHearing(echoed);
+    void send({ history: echoed.history, answer: text }, echoed);
   };
 
   const handleRetry = () => {
     const turn = lastTurnRef.current;
-    if (!turn || pending) return;
-    void send(turn);
+    if (!session || !turn || pending) return;
+    void send(turn, session);
   };
 
   const handleRestart = () => {
     clearHearing();
     setSession(EMPTY_SESSION);
     setResumed(false);
-    void send({ history: [], answer: "" });
+    void send({ history: [], answer: "" }, EMPTY_SESSION);
   };
 
   if (!session) {
@@ -115,11 +127,11 @@ export function HearingPage() {
         </p>
       ) : null}
 
-      <ChatLog messages={toMessages(session.history)} />
+      <ChatLog messages={session.messages} />
 
       {session.question ? <AskPanel question={session.question} hint={session.hint} /> : null}
 
-      <TurnStatus pending={pending} failure={failure} onRetry={handleRetry} />
+      <TurnStatus pending={pending} failure={failure} completed={doneMessage(session)} onRetry={handleRetry} />
 
       {session.done ? (
         <section className="candidates">

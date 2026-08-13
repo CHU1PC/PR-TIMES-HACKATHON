@@ -130,7 +130,12 @@ export function SparringPage() {
 
         {session.question ? <AskPanel question={session.question} hint={session.hint} /> : null}
 
-        <TurnStatus pending={pending} failure={failure} onRetry={handleRetry} />
+        <TurnStatus
+          pending={pending}
+          failure={failure}
+          completed={session.ready ? "出せる形になりました。決まった内容を下にまとめています。" : null}
+          onRetry={handleRetry}
+        />
 
         {session.ready ? (
           <section className="ready">

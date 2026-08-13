@@ -35,6 +35,8 @@ export interface SparringSession {
 export interface HearingSession {
   /** サーバーに送り返す往復履歴 */
   history: Exchange[];
+  /** 画面に出す会話の記録。サーバーは保持しない */
+  messages: ChatMessage[];
   /** いま出ている質問 */
   question: string | null;
   /** いま出ている例示 */
@@ -75,6 +77,8 @@ function isHearingSession(value: unknown): value is HearingSession {
   return (
     Array.isArray(value.history) &&
     value.history.every(isExchange) &&
+    Array.isArray(value.messages) &&
+    value.messages.every(isChatMessage) &&
     isTextOrNull(value.question) &&
     isTextOrNull(value.hint) &&
     Array.isArray(value.candidates) &&
