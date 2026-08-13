@@ -29,7 +29,7 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
         ) : (
           <Link to="/entry" className="app-header__action">
             <Icon name="plus" size={19} />
-            <span>イベントを追加</span>
+            <span>新しいPRネタを作る</span>
           </Link>
         )}
       </div>
