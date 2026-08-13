@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 from sqlmodel import SQLModel
 
 from alembic import context
@@ -12,8 +13,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 接続先は alembic.ini ではなく環境変数から取る。ini に平文を置かない
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.get_secret_value())
+# postgresql:// のままだと psycopg2 を探しに行く。% は ConfigParser の補間に食われる
+_url = make_url(settings.DATABASE_URL.get_secret_value()).set(drivername="postgresql+psycopg")
+config.set_main_option("sqlalchemy.url", _url.render_as_string(hide_password=False).replace("%", "%%"))
 
 target_metadata = SQLModel.metadata
 
