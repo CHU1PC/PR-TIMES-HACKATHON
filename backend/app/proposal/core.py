@@ -96,7 +96,6 @@ async def propose(draft: PlanDraft) -> ProposalResponse:
     if not cases:
         return ProposalResponse(suggestions=[], cases=[], media=[])
 
-    # 媒体名は LLM に作らせず, 転載ログから引く。作文されると実測でない媒体名が顧客に出る
     per_case, overall = await distinctive([(c.company_id, c.release_id) for c in cases])
     for case in cases:
         case.media = per_case.get((case.company_id, case.release_id), [])
@@ -107,7 +106,6 @@ async def propose(draft: PlanDraft) -> ProposalResponse:
             Suggestion(
                 action=s.action,
                 reason=s.reason,
-                # LLM は渡していない番号を書くことがある。範囲外は落とし, 1始まりを配列の位置に直す
                 cited=sorted({n - 1 for n in s.cited if 1 <= n <= len(cases)}),
             )
             for s in result.suggestions
