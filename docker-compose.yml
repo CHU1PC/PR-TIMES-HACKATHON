@@ -10,6 +10,14 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?.env に OPENAI_API_KEY が無い}
       DATABASE_URL: ${DATABASE_URL:?.env に DATABASE_URL が無い}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?.env に ALLOWED_ORIGINS が無い}
+      # 空でも起動する。カレンダーを使わない開発者を止めない
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Console の「承認済みのリダイレクト URI」と完全一致していないと弾かれる
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/calendar/oauth/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # ローカルは HTTP なので Secure を外す。本番は true
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # glibc malloc arena 数を制限して RSS 単調増加を抑える
       MALLOC_ARENA_MAX: "2"
     ports:
