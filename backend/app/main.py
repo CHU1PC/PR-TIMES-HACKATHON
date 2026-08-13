@@ -8,10 +8,11 @@ app = FastAPI(
     title="未来のPRネタを作り出すAI",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+    redoc_url=None,
+    swagger_ui_oauth2_redirect_url="/api/docs/oauth2-redirect",
 )
 
-# フロントは S3 に置き CloudFront が同一オリジンに束ねるので, 本番では CORS を通らない。
-# 開発時だけ Vite (5173) から直接叩くため許可する
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
