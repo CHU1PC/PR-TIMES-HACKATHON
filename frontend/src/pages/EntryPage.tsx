@@ -1,13 +1,23 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { calendarEvents } from "@/api";
 import { Icon } from "@/components/Icon";
 import { formatDate, isValidDate } from "@/lib/date";
 import { loadHearing, loadSparring } from "@/lib/session";
 import { Link, navigate, useQueryParam } from "@/router";
+import type { CalendarEvent } from "@/types";
 
 function sparringPath(title: string, startDate: string | null): string {
   const params = new URLSearchParams({ title });
   if (startDate) params.set("date", startDate);
   return `/sparring?${params.toString()}`;
+}
+
+/** "YYYY-MM-DD" のその日1日ぶんを RFC3339 の範囲にする */
+function dayRange(day: string): { timeMin: string; timeMax: string } {
+  const [year, month, date] = day.split("-").map(Number);
+  const from = new Date(year ?? 0, (month ?? 1) - 1, date ?? 1, 0, 0, 0);
+  const to = new Date(year ?? 0, (month ?? 1) - 1, date ?? 1, 23, 59, 59);
+  return { timeMin: from.toISOString(), timeMax: to.toISOString() };
 }
 
 export function EntryPage() {
@@ -16,6 +26,26 @@ export function EntryPage() {
   const selectedDate = isValidDate(dateParam) ? dateParam : null;
   const [title, setTitle] = useState(() => titleParam?.trim() ?? "");
   const [saved] = useState(() => ({ sparring: loadSparring(), hearing: loadHearing() }));
+  const [dayEvents, setDayEvents] = useState<CalendarEvent[]>([]);
+
+  const controllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    void calendarEvents(dayRange(selectedDate), controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      // 未ログインでも入力はできる。予定が引けないときは候補を出さないだけ
+      setDayEvents(result.ok ? result.data.events : []);
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [selectedDate]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -59,6 +89,26 @@ export function EntryPage() {
           </div>
 
           <p className="entry__description">これからやることを1行で入力してください。詳しい中身は、このあと一緒に決めていきます。</p>
+
+          {dayEvents.length > 0 ? (
+            <div className="entry__picks">
+              <p className="entry__picks-label">この日の予定から選ぶ</p>
+              <ul className="entry__picks-list">
+                {dayEvents.map((event) => (
+                  <li key={event.id}>
+                    <button
+                      type="button"
+                      className={`entry__pick${title === event.title ? " is-selected" : ""}`}
+                      onClick={() => setTitle(event.title)}
+                      aria-pressed={title === event.title}
+                    >
+                      {event.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <label className="entry__label" htmlFor="entry-title">
             これからやること
