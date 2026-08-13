@@ -49,6 +49,26 @@ Parameters:
     Type: String
     Description: ECR のイメージ URI. タグまで含める. CI が git sha を渡す
 
+  WebAclArn:
+    Type: String
+    Description: waf スタック (us-east-1) が作った WebACL の ARN
+
+  OriginVerifySecret:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: >-
+      CloudFront が付ける秘密のヘッダ. ALB はこれが一致しないリクエストを 403 で落とす.
+      SG は CloudFront 全体を許可しているので, これが無いと他人の CloudFront から直接届く
+
+  ExecutionRoleArn:
+    Type: String
+    Description: roles スタックが作った実行ロール. CI はロールを作れないので ARN で受け取る
+
+  TaskRoleArn:
+    Type: String
+    Description: roles スタックが作ったタスクロール
+
   DbSecurityGroupId:
     Type: String
     AllowedPattern: "^sg-[0-9a-f]+$"
@@ -150,6 +170,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         Comment: !Ref NamePrefix
+        WebACLId: !Ref WebAclArn
         HttpVersion: http2
         # 日本を含む最小構成. PriceClass_All より安い
         PriceClass: PriceClass_200
@@ -162,6 +183,10 @@ Resources:
               OriginAccessIdentity: ""
           - Id: alb-backend
             DomainName: !GetAtt LoadBalancer.DNSName
+            # これが無いリクエストは ALB が 403 で落とす
+            OriginCustomHeaders:
+              - HeaderName: X-Origin-Verify
+                HeaderValue: !Ref OriginVerifySecret
             CustomOriginConfig:
               OriginProtocolPolicy: http-only
               HTTPPort: 80
@@ -333,7 +358,25 @@ Resources:
       LoadBalancerArn: !Ref LoadBalancer
       Port: 80
       Protocol: HTTP
+      # 既定で落とし, 私たちの CloudFront から来たものだけをルールで通す
       DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: "403"
+            ContentType: text/plain
+            MessageBody: Forbidden
+
+  ListenerRuleFromOurCloudFront:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref Listener
+      Priority: 1
+      Conditions:
+        - Field: http-header
+          HttpHeaderConfig:
+            HttpHeaderName: X-Origin-Verify
+            Values: [!Ref OriginVerifySecret]
+      Actions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
 
@@ -346,53 +389,6 @@ Resources:
       RetentionInDays: 7
 
   # イメージの取得とキーの注入を行うのはこちら。アプリのコードはこのロールを使わない
-  ExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${NamePrefix}-exec"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-      Policies:
-        - PolicyName: read-secrets
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              # 名指しした2本だけ。プレフィックス一括にすると, 後で足した別用途の値まで読めてしまう
-              - Effect: Allow
-                Action: ssm:GetParameters
-                Resource:
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
-
-              # SecureString の復号。AWS 管理鍵なら鍵ポリシー側で許可されるはずだが,
-              # 外れるとタスクが起動できないので明示する。SSM 経由の復号だけに限る
-              - Effect: Allow
-                Action: kms:Decrypt
-                Resource: "*"
-                Condition:
-                  StringEquals:
-                    kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
-
-  # アプリが引くロール。外に出るのは OpenAI だけで AWS API は叩かないので中身は空
-  TaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${NamePrefix}-task"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -405,8 +401,8 @@ Resources:
         # CI のランナーが x86 なので, エミュレーション無しで積めるこちらに揃える
         CpuArchitecture: X86_64
         OperatingSystemFamily: LINUX
-      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      TaskRoleArn: !Ref TaskRoleArn
       ContainerDefinitions:
         - Name: backend
           Image: !Ref ImageUri
