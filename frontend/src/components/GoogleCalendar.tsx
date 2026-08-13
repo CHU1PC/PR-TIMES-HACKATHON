@@ -5,7 +5,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 
 import type { EventClickArg } from "@fullcalendar/core";
 
-import { calendarEvents, calendarLoginUrl, calendarStatus, type ApiFailure } from "@/api";
+import { calendarDisconnect, calendarEvents, calendarLoginUrl, calendarStatus, type ApiFailure } from "@/api";
 import type { CalendarEvent, CalendarRange, CalendarStatus } from "@/types";
 
 /** 先月頭から3ヶ月先の頭まで引く */
@@ -22,6 +22,7 @@ export function GoogleCalendar() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const controllerRef = useRef<AbortController | null>(null);
   const startedRef = useRef(false);
@@ -69,6 +70,20 @@ export function GoogleCalendar() {
     if (event) setSelectedEvent(event);
   };
 
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    const result = await calendarDisconnect();
+    setDisconnecting(false);
+    // 401 はセッションが既に切れているだけ。解除済みとして扱う
+    if (!result.ok && result.kind !== "unauthorized" && result.kind !== "cancelled") {
+      setFailure(result);
+      return;
+    }
+    setSelectedEvent(null);
+    setEvents([]);
+    void load();
+  };
+
   if (failure) {
     return (
       <section className="calendar">
@@ -100,7 +115,12 @@ export function GoogleCalendar() {
 
   return (
     <section className="calendar">
-      <h2 className="calendar__title">Googleカレンダー</h2>
+      <div className="calendar__head">
+        <h2 className="calendar__title">Googleカレンダー</h2>
+        <button type="button" className="button button--small" onClick={handleDisconnect} disabled={disconnecting}>
+          連携を解除
+        </button>
+      </div>
 
       <div className="calendar__body">
         <FullCalendar
