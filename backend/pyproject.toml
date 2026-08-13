@@ -7,7 +7,11 @@ dependencies = [
     # CI が本番のイメージのまま upgrade head を流すので, 実行時側に置く
     "alembic>=1.19.1",
     "fastapi[standard]>=0.115",
+    "google-api-python-client>=2.198.0",
+    "google-auth-httplib2>=0.4.1",
+    "google-auth-oauthlib>=1.4.0",
     "httpx>=0.28",
+    "itsdangerous>=2.2.0",
     "langchain-core>=1.5.4",
     "langchain-openai>=1.4.3",
     "loguru>=0.7.3",

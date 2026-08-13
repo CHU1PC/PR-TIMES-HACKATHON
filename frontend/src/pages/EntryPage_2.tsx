@@ -16,9 +16,11 @@ export function EntryPage() {
 
   return (
     <section className="page">
-      <h1 className="page__title">これからやることを1行で入れてください</h1>
       <GoogleCalendar />
+      <h1 className="page__title">これからやることを1行で入れてください</h1>
       <p>これからやることを1行で入れてください</p>
+      <p className="page__lead">中身はこのあと一緒に決めていきます。決まっているところまでで構いません。</p>
+
       <form className="entry" onSubmit={handleSubmit}>
         <label className="entry__label" htmlFor="entry-title">
           これからやること
