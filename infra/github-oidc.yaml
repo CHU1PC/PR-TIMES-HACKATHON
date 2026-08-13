@@ -178,6 +178,16 @@ Resources:
                   - application-autoscaling:*
                 Resource: "*"
 
+              # ターゲット追跡が自分で作るアラーム
+              - Sid: AlarmsCreatedByTargetTracking
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:GetMetricData
+                Resource: "*"
+
               - Sid: Logs
                 Effect: Allow
                 Action:
@@ -221,6 +231,7 @@ Resources:
                   StringEquals:
                     iam:AWSServiceName:
                       - ecs.amazonaws.com
+                      - ecs.application-autoscaling.amazonaws.com
                       - elasticloadbalancing.amazonaws.com
 
               # CI はキーの値を使わない. タスク定義に ARN を書くために存在確認するだけ。
