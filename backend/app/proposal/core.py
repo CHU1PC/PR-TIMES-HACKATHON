@@ -37,7 +37,7 @@ async def categories() -> dict[str, int]:
     """
     if not _categories:
         async with session() as db:
-            rows = (await db.execute(CATEGORIES_SQL)).all()
+            rows = (await db.execute(CATEGORIES_SQL)).tuples().all()
         _categories.update(rows)
     return _categories
 
