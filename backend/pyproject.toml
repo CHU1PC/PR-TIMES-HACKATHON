@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "PR TIMES Hackathon 2026 Summer / Team1"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    # CI が本番のイメージのまま upgrade head を流すので, 実行時側に置く
+    "alembic>=1.19.1",
     "fastapi[standard]>=0.115",
     "httpx>=0.28",
     "langchain-core>=1.5.4",
@@ -22,7 +24,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "alembic>=1.19.1",
     "pytest>=8.3",
     "ruff>=0.15",
 ]

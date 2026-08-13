@@ -42,6 +42,8 @@ WORKDIR /app
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 COPY --chown=appuser:appuser --from=builder /app/.venv ./.venv
 COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser alembic.ini ./
+COPY --chown=appuser:appuser alembic/ ./alembic/
 
 USER appuser
 
