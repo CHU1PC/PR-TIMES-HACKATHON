@@ -1,123 +1,94 @@
-# デプロイ手順
+# デプロイ
 
-EC2 (`13.112.91.188`) の **8080 番**に、FastAPI + Vite ビルド成果物を 1 コンテナで載せる。
-インフラの詳細は `docs/infra.md` を参照。
+`main` に push すると [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) が全部やる。
+AWS 側の初回セットアップは [infra/README.md](../infra/README.md)、環境の identifier は [infra.md](infra.md)。
 
 ## 構成
 
-| ファイル | 役割 |
-|---|---|
-| `backend/Dockerfile` | 3 ステージ（bun でフロントをビルド → uv で Python 依存 → 実行） |
-| `docker-compose.yml` | サービス 1 つ。`8080:8080` で公開 |
-| `deploy.sh` | ローカル → EC2 の rsync + build + 疎通確認 |
-
-FastAPI が `frontend/dist` を同一オリジンで配信するため nginx は要らない。
-`app/settings/paths.py` の `ROOT = parents[3]` に合わせ、コンテナ内は
-`/app/backend`（アプリ）と `/app/frontend/dist`（静的ファイル）に配置している。
-
-## 前提
-
-- **80 番は pgAdmin (gunicorn) が使用中。絶対に潰さない**
-- `ubuntu` ユーザーは docker グループに入っていないので `sudo docker compose` で叩く
-- 自宅などから作業する場合、IP が変わったらセキュリティグループを更新する
-  （`curl -4 -s ifconfig.me` → `docs/infra.md` の `authorize-security-group-ingress`）
-
-## 1. `.env` を用意する
-
-`.env` は **git に入れない**。`.env.example` をコピーして値を埋める。
-
-```bash
-cp .env.example .env
+```text
+ブラウザ → CloudFront ─┬─ /*      → S3（フロントの dist）
+                        └─ /api/*  → ALB → ECS Fargate（FastAPI :8000）
+                                              ├→ RDS + pgvector（コーパス検索）
+                                              └→ OpenAI API（埋め込みと生成）
 ```
 
-EC2 用に 2 つ書き換える。
+フロントとバックエンドは**同一オリジン**で配られる。本番で CORS は効かない。
 
-| キー | ローカル | EC2 |
-|---|---|---|
-| `DATABASE_URL` | `...@127.0.0.1:15432/prtimes`（SSH トンネル） | RDS エンドポイントを直接（同一 VPC のためトンネル不要） |
-| `ALLOWED_ORIGINS` | `'["http://localhost:5173"]'` | `'["http://13.112.91.188:8080"]'` |
+## 手元で動かす
 
-`deploy.sh` が `.env` を毎回 scp で送るので、手動転送は不要。
-手で送る場合は次のとおり。**rsync は `.env` を除外している**（`--delete` で消さないため）。
+コンテナは要らない。バックエンドとフロントを別々に起動する。
 
 ```bash
-scp -i ~/.ssh/prtimes/hackathon.pem .env ubuntu@13.112.91.188:/home/ubuntu/prtimes-hackathon/.env
+# ターミナル1: バックエンド (:8000)
+cd backend && uv run --env-file ../.env fastapi dev
+
+# ターミナル2: フロント (:5173)
+cd frontend && bun run dev
 ```
 
-## 2. デプロイする
+`proposal` 機能は RDS を読むので、事前に SSH トンネルを張って `.env` の `DATABASE_URL` を
+`127.0.0.1:15434` に向ける（[infra.md](infra.md) の「手元から RDS を見る」）。
+壁打ちとヒアリングだけなら DB は要らない。
+
+`.env` に要るのは3つ。
+
+| 変数 | 用途 |
+| --- | --- |
+| `OPENAI_API_KEY` | 壁打ち・ヒアリング・提案・埋め込み |
+| `DATABASE_URL` | コーパス検索。トンネル経由 |
+| `ALLOWED_ORIGINS` | dev は `'["http://localhost:5173"]'` |
+
+本番と同じイメージを手元で確かめるときだけ compose を使う。
 
 ```bash
-./deploy.sh                          # 鍵は ~/.ssh/prtimes/hackathon.pem
-./deploy.sh /path/to/other-key.pem   # 鍵を指定する場合
+docker compose up --build
 ```
 
-やっていること。
+## デプロイされるもの
 
-1. `rsync` でソースを `/home/ubuntu/prtimes-hackathon/` へ同期
-   （`data/` `.venv/` `node_modules/` `dist/` `.git/` は送らない）
-2. `.env` を scp
-3. EC2 上で `sudo docker compose up -d --build`
-4. `http://13.112.91.188:8080/api/health` を最大 60 秒リトライして確認
+`main` への push（または Actions タブから手動実行）で、この順に走る。
 
-成功すると `OK: {"ok":true}` が出る。失敗すると直近 50 行のログを表示して終了する。
+| # | 内容 |
+| --- | --- |
+| 1 | ruff / pytest / `tsc --noEmit` |
+| 2 | イメージをビルドして ECR へ push（タグは git sha の先頭12桁） |
+| 3 | `ecr` スタックを作る（無ければ） |
+| 4 | `app` スタックを流す。イメージのタグが変わるのでタスク定義が新しくなりサービスが入れ替わる |
+| 5 | フロントをビルドして S3 へ同期、CloudFront のキャッシュを飛ばす |
+| 6 | `/api/health` が返るまで最大150秒待つ |
 
-## 3. 手で操作する
+URL は Actions の実行サマリに出る。
+
+**`db` スタックは CI では流さない。** DB の作り直しはデプロイのたびに起きてよいことではない。
+
+## migration
+
+**自動では走らない。** 手元からトンネル越しに当てる。
 
 ```bash
-ssh -i ~/.ssh/prtimes/hackathon.pem ubuntu@13.112.91.188
-cd /home/ubuntu/prtimes-hackathon
-
-sudo docker compose ps            # 状態 (health も出る)
-sudo docker compose logs -f       # ログ追尾
-sudo docker compose restart       # 再起動 (ビルドし直さない)
-sudo docker compose up -d --build # 再ビルドして入れ替え
-sudo docker compose down          # 停止して 8080 を空ける
+cd backend && uv run alembic upgrade head
 ```
 
-## 4. ロールバック
-
-イメージは `prtimes-hackathon-app:latest` に上書きされるので、**戻したいコミットから
-ビルドし直す**のが確実。
+列の削除を含む migration が本番で自動実行されると戻せないため、意図的に手動にしてある。
+モデルを変えたら migration を作り、**デプロイの前に**当てる。
 
 ```bash
-git checkout <戻したいコミット>
-./deploy.sh
-git checkout main
+uv run alembic revision --autogenerate -m "add users and sessions"
 ```
 
-デモ直前など、確実に戻したい版がある場合は入れ替え前にタグを退避しておく。
+## 止める
 
-```bash
-# EC2 上で、build する前に現行イメージを退避
-sudo docker tag prtimes-hackathon-app:latest prtimes-hackathon-app:rollback
+タスクの課金だけ止めるなら `DesiredCount=0`（[infra/README.md](../infra/README.md)）。
 
-# 戻すとき
-sudo docker compose down
-sudo docker tag prtimes-hackathon-app:rollback prtimes-hackathon-app:latest
-sudo docker compose up -d --no-build
-```
+## 詰まったとき
 
-とにかく止めたいときは `sudo docker compose down`。80 番の pgAdmin には影響しない。
+| 症状 | 見るところ |
+| --- | --- |
+| タスクが起動と停止を繰り返す | CloudWatch Logs `/ecs/prtimes-hackathon-2026summer-backend`。キーの取得失敗が多い |
+| ターゲットが unhealthy のまま | ヘルスチェックは `/api/health`。ルータの prefix を変えたら合わせる |
+| `/api/*` が 403 | CloudFront の `/api/*` ビヘイビアが ALB を向いているか。S3 側に落ちていないか |
+| 画面は出るが API だけ 404 | S3 の `CustomErrorResponses`（403→index.html）に吸われている。ALB 側の応答を直接確かめる |
+| デプロイが `UnauthorizedOperation` | IAM ポリシーが古い。エラーが名指しするアクションを足す |
 
-## トラブルシュート
-
-**`ALLOWED_ORIGINS` のパースで落ちる**
-
-`.env` の値はシングルクォートで囲っている。compose の `env_file:` はクォートを剥がすが、
-`docker run --env-file` は**剥がさない**ためそのまま渡って JSON パースに失敗する。
-ローカルで単体起動して確認したいときは `docker compose up` を使うか、
-`-e 'ALLOWED_ORIGINS=["http://localhost:8080"]'` で個別に渡す。
-
-**ssh がタイムアウトする**
-
-IP が変わってセキュリティグループから外れている。`docs/infra.md` の手順で再登録する。
-
-**ビルドが遅い / メモリが足りない**
-
-t3.medium は 2 vCPU / 3.7GB を pgAdmin と分け合う。不要なイメージが溜まっていたら
-`sudo docker system prune -f` で掃除する（`data/` は転送していないのでディスクは
-主にイメージが食っている）。
-
-**8080 が既に使われている**
-
-`sudo ss -tlnp | grep 8080` で確認。自分の古いコンテナなら `sudo docker compose down`。
+ALB を直接叩いて切り分けたいときは、SG が CloudFront 以外を弾くので**一時的に自分の IP を足す**。
+確認が終わったら必ず消すこと。

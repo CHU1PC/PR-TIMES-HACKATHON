@@ -27,10 +27,3 @@ data/
 # 計画メモ（ツールのスクラッチ）
 .hermes/
 
-# Terraform（state は資源の実体情報を含むのでコミットしない）
-infra/.terraform/
-infra/*.tfstate
-infra/*.tfstate.*
-infra/.terraform.lock.hcl
-infra/*.tfvars
-!infra/*.tfvars.example
