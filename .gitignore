@@ -20,9 +20,6 @@ dist/
 # ETL 出力（RDS由来のデータはコミットしない）
 data/
 
-# Google Calendar のトークン（保存先の作り直しは #8）
-google_token.json
-
 # misc
 # draw.io が編集中に作る退避ファイル
 .$*.drawio.bkp
