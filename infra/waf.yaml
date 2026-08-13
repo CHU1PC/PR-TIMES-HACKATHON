@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFront 用の WAF. Scope が CLOUDFRONT の WebACL は us-east-1 にしか作れない
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: prtimes-hackathon-2026summer
+
+  RequestsPer5Minutes:
+    Type: Number
+    Default: 100
+    MinValue: 10
+    Description: >-
+      1つの IP からこの数を超えたら遮断する.
+      /api/proposal は1回で 埋め込み1回 + LLM生成2回 を消費するので, 共有キーを守るために絞る
+
+Resources:
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub "${NamePrefix}-cloudfront"
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      Rules:
+        - Name: rate-limit-per-ip
+          Priority: 0
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref RequestsPer5Minutes
+              EvaluationWindowSec: 300
+              # CloudFront に付けるので接続元がそのまま利用者. ヘッダを見る必要がなく詐称もされない
+              AggregateKeyType: IP
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub "${NamePrefix}-rate-limit"
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub "${NamePrefix}-webacl"
+      Tags:
+        - Key: Project
+          Value: prtimes-hackathon
+
+Outputs:
+  WebAclArn:
+    Description: app スタックの WebAclArn に渡す
+    Value: !GetAtt WebAcl.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-WebAclArn"
