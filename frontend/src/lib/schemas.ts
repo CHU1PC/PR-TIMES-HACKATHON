@@ -207,11 +207,13 @@ export const calendarRangeSchema = z.object({
 });
 
 export const calendarStatusSchema = z.object({
-  /** Google と連携済みか */
+  /** この環境で連携機能が使えるか。false なら連携ボタンを出さない */
+  configured: z.boolean(),
+  /** この人が Google と連携済みか */
   connected: z.boolean(),
 });
 
-export const calendarEventsResponseSchema = z.object({
+export const calendarEventsSchema = z.object({
   /** Google と連携済みか */
   connected: z.boolean(),
   /** 未連携なら空 */

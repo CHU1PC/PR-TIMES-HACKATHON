@@ -2,7 +2,7 @@ import type { z } from "zod";
 
 import type {
   calendarEventSchema,
-  calendarEventsResponseSchema,
+  calendarEventsSchema,
   calendarRangeSchema,
   calendarStatusSchema,
   candidateSchema,
@@ -69,4 +69,4 @@ export type CalendarRange = z.infer<typeof calendarRangeSchema>;
 
 export type CalendarStatus = z.infer<typeof calendarStatusSchema>;
 
-export type CalendarEventsResponse = z.infer<typeof calendarEventsResponseSchema>;
+export type CalendarEvents = z.infer<typeof calendarEventsSchema>;
