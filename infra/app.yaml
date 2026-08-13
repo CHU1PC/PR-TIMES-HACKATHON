@@ -430,6 +430,38 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: backend
 
+  # 本番と同じイメージ・同じ SG で alembic を1回だけ流す。CI が RunTask で起こす
+  MigrationTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-migrate"
+      Cpu: "512"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      TaskRoleArn: !Ref TaskRoleArn
+      ContainerDefinitions:
+        - Name: migrate
+          Image: !Ref ImageUri
+          Essential: true
+          Command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
+            # env.py は Settings 経由で読むので, 使わないが必須項目として要る
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: migrate
+
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -515,3 +547,17 @@ Outputs:
   AlbDnsName:
     Description: CloudFront を通さずに切り分けるとき用. SG で CloudFront 以外は弾かれる
     Value: !GetAtt LoadBalancer.DNSName
+
+  MigrationTaskDefinitionArn:
+    Description: リビジョン付き. 今流したイメージで確実に起こすため family 名では渡さない
+    Value: !Ref MigrationTaskDefinition
+
+  TaskSubnetIds:
+    Value: !Join [",", [!Ref ExistingPublicSubnetId, !Ref PublicSubnetC]]
+
+  TaskSecurityGroupId:
+    Description: DB 側がこの SG からの 5432 を通す
+    Value: !Ref TaskSecurityGroup
+
+  LogGroupName:
+    Value: !Ref LogGroup
