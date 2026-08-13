@@ -222,38 +222,29 @@ export function HomePage() {
                     const dayEvents = eventsByDate.get(day.key) ?? [];
                     const shown = dayEvents.slice(0, EVENTS_PER_DAY);
                     const hidden = dayEvents.length - shown.length;
-                    const leadEvent = shown[0];
-                    const dayContent = (
-                      <>
-                        <span className={`calendar-day__number${weekdayIndex === 0 ? " is-sunday" : weekdayIndex === 6 ? " is-saturday" : ""}`}>
-                          {day.date.getDate()}
-                        </span>
-                        {shown.map((event) => (
-                          <span key={event.id} className="calendar-event calendar-event--blue">
-                            <span aria-hidden="true" />
-                            <span className="calendar-event__title">{event.title}</span>
-                            <span className="calendar-event__compact" aria-hidden="true">予定</span>
-                          </span>
-                        ))}
-                        {hidden > 0 ? <span className="calendar-event__more">ほか{hidden}件</span> : null}
-                      </>
-                    );
+                    const weekendClass = weekdayIndex === 0 ? " is-sunday" : weekdayIndex === 6 ? " is-saturday" : "";
                     return (
                       <td key={day.key} className={!day.isCurrentMonth ? "is-outside" : undefined}>
-                        {leadEvent ? (
-                          <Link
-                            to={entryPath(day.key, leadEvent.title)}
-                            className={`calendar-day has-event${day.isToday ? " is-today" : ""}`}
-                            aria-label={`${formatDate(day.key)}、${leadEvent.title}を選択`}
-                            aria-current={day.isToday ? "date" : undefined}
-                          >
-                            {dayContent}
-                          </Link>
-                        ) : (
-                          <div className={`calendar-day calendar-day--empty${day.isToday ? " is-today" : ""}`} aria-current={day.isToday ? "date" : undefined}>
-                            {dayContent}
-                          </div>
-                        )}
+                        {/* セルごとリンクにすると1日に2件あるとき2件目を選べない。予定ごとにリンクを張る */}
+                        <div
+                          className={`calendar-day${dayEvents.length > 0 ? " has-event" : " calendar-day--empty"}${day.isToday ? " is-today" : ""}`}
+                          aria-current={day.isToday ? "date" : undefined}
+                        >
+                          <span className={`calendar-day__number${weekendClass}`}>{day.date.getDate()}</span>
+                          {shown.map((event) => (
+                            <Link
+                              key={event.id}
+                              to={entryPath(day.key, event.title)}
+                              className="calendar-event calendar-event--blue"
+                              aria-label={`${formatDate(day.key)}、${event.title}を選択`}
+                            >
+                              <span aria-hidden="true" />
+                              <span className="calendar-event__title">{event.title}</span>
+                              <span className="calendar-event__compact" aria-hidden="true">予定</span>
+                            </Link>
+                          ))}
+                          {hidden > 0 ? <span className="calendar-event__more">ほか{hidden}件</span> : null}
+                        </div>
                       </td>
                     );
                   })}
