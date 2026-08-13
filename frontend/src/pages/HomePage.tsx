@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { calendarEvents, calendarLoginUrl, calendarStatus } from "@/api";
+import { calendarEvents, calendarStatus } from "@/api";
 import { Icon } from "@/components/Icon";
 import { formatDate } from "@/lib/date";
 import { Link } from "@/router";
-import type { CalendarEvent, CalendarStatus } from "@/types";
+import type { CalendarEvent } from "@/types";
 
 /** 日セルとランキングに出す1件。Google の予定を画面用に均したもの */
 interface DayEvent {
@@ -75,7 +75,6 @@ function entryPath(eventDate: string, title?: string): string {
 export function HomePage() {
   const now = new Date();
   const [visibleMonth, setVisibleMonth] = useState(() => ({ year: now.getFullYear(), month: now.getMonth() }));
-  const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [events, setEvents] = useState<DayEvent[]>([]);
 
   const controllerRef = useRef<AbortController | null>(null);
@@ -97,8 +96,10 @@ export function HomePage() {
 
     const current = await calendarStatus(controller.signal);
     if (controller.signal.aborted) return;
-    if (!current.ok) return;
-    setStatus(current.data);
+    if (!current.ok) {
+      setEvents([]);
+      return;
+    }
 
     // 未連携・未設定は予定を出さない。空のカレンダーだけ残す
     if (!current.data.configured || !current.data.connected) {
@@ -117,8 +118,8 @@ export function HomePage() {
       controller.signal,
     );
     if (controller.signal.aborted) return;
+    // 401 はセッション切れ。未連携と同じく予定を出さない
     if (!result.ok) {
-      if (result.kind === "unauthorized") setStatus({ ...current.data, connected: false });
       setEvents([]);
       return;
     }
@@ -178,13 +179,7 @@ export function HomePage() {
             <p className="section-heading__kicker">SCHEDULE</p>
             <h2 id="calendar-title" className="calendar-card__title">カレンダー</h2>
           </div>
-          {status?.configured && !status.connected ? (
-            <a href={calendarLoginUrl()} className="button button--small">
-              Googleカレンダーと連携する
-            </a>
-          ) : (
-            <p>日付を選択すると、PRネタの作成を始められます。</p>
-          )}
+          <p>日付を選択すると、PRネタの作成を始められます。</p>
         </div>
 
         <div className="calendar-toolbar">
