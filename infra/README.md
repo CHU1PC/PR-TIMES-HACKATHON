@@ -5,9 +5,9 @@
 
 | ファイル | 中身 | 誰が流すか |
 | --- | --- | --- |
-| `iam.yaml` | OIDC 信頼 / CI のロール / **deploy ポリシー**（共通）/ **bootstrap ポリシー**（手元だけ） | 手元から1回 |
+| `iam.yaml` | OIDC 信頼 / CI のロール / **deploy ポリシー**(共通)/ **bootstrap ポリシー**(手元だけ) | 手元から1回 |
 | `roles.yaml` | ECS タスクが引く2つのロール | 手元から1回 |
-| `db.yaml` | アプリの PostgreSQL（pgvector） | 手元から1回 |
+| `db.yaml` | アプリの PostgreSQL(pgvector) | 手元から1回 |
 | `waf.yaml` | CloudFront 用の WAF。**us-east-1** | CI |
 | `ecr.yaml` | バックエンドのイメージ置き場 | CI |
 | `app.yaml` | S3 / CloudFront / ALB / ECS Fargate / オートスケーリング / ログ | CI |
@@ -22,7 +22,7 @@
 
 | ポリシー | 何ができるか | 誰に付くか |
 | --- | --- | --- |
-| `prtimes-hackathon-deploy` | スタック更新 / ECR / S3 / CloudFront / ECS / SG / WAF | CI（自動）＋ 手元 |
+| `prtimes-hackathon-deploy` | スタック更新 / ECR / S3 / CloudFront / ECS / SG / WAF | CI(自動)+ 手元 |
 | `prtimes-hackathon-bootstrap` | ロール作成 / OIDC プロバイダ / **RDS** / SSM 書き込み | **手元だけ** |
 
 **CI はロールを作れない。** `iam:CreateRole` を持たないので、権限の広いロールを作って ECS に渡す経路が無い。
@@ -30,7 +30,7 @@
 
 **CI は RDS を触れない。** DB の作り直しがデプロイのたびに起きてよいことではないため。
 
-主催者の資源（スタック・RDS・EC2）には **Deny** を置いてある。Deny は Allow に優先する。
+主催者の資源(スタック・RDS・EC2)には **Deny** を置いてある。Deny は Allow に優先する。
 
 ## 初回だけやること
 
@@ -86,7 +86,7 @@ aws cloudformation deploy --profile prtimes --region ap-northeast-1 \
 
 ### 4. DB を作ってコーパスを入れる
 
-パスワードは英数字だけで作る（RDS は `/ " @ 空白` を受け付けない）。
+パスワードは英数字だけで作る(RDS は `/ " @ 空白` を受け付けない)。
 
 ```bash
 PW=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
@@ -120,12 +120,12 @@ uv run --group etl python -m etl.load_corpus
 
 **これをやらないと `/api/proposal` がテーブル未作成で 500 になる。**
 
-### 5. カレンダー連携を使うなら Google の値を置く（任意）
+### 5. カレンダー連携を使うなら Google の値を置く(任意)
 
 使わないなら飛ばしてよい。置かないうちは `/api/calendar/status` が `configured: false` を返し、
 画面に連携の導線が出ないだけで、壁打ちも提案も動く。
 
-Google Cloud Console で OAuth クライアント（種別: ウェブアプリケーション）を作り、
+Google Cloud Console で OAuth クライアント(種別: ウェブアプリケーション)を作り、
 **承認済みのリダイレクト URI** に本番のものを登録する。
 
 ```
@@ -137,7 +137,7 @@ https://<CloudFront のドメイン>/api/calendar/oauth/callback
 
 得た2つを Parameter Store へ置く。**値は履歴に残さない。**
 
-`read -s` なので入力は画面に出ず、履歴にも値は残らない（zsh の書き方）。
+`read -s` なので入力は画面に出ず、履歴にも値は残らない(zsh の書き方)。
 
 ```bash
 read -rs "CID?client id: " && echo && \
@@ -182,7 +182,7 @@ aws ec2 describe-subnets --profile prtimes --region ap-northeast-1 \
 | --- | --- |
 | `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::...:role/prtimes-hackathon-github-actions` |
 | `VPC_ID` | `vpc-xxxxxxxx` |
-| `PUBLIC_SUBNET_ID` | `subnet-aaaa`（既存のパブリック1枚。1c は app スタックが作る） |
+| `PUBLIC_SUBNET_ID` | `subnet-aaaa`(既存のパブリック1枚。1c は app スタックが作る) |
 
 ## 以降のデプロイ
 
@@ -191,7 +191,7 @@ aws ec2 describe-subnets --profile prtimes --region ap-northeast-1 \
 
 **migration は CI が当てる。** サービスを入れ替える前に、本番と同じイメージを ECS の
 使い捨てタスクとして VPC の中で起こして `alembic upgrade head` を流す。落ちたらそこで止まる。
-コーパスの投入（`etl.load_corpus`）は自動では走らない。
+コーパスの投入(`etl.load_corpus`)は自動では走らない。
 
 ## 止めるとき
 

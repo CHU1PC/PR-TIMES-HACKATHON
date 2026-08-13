@@ -94,7 +94,7 @@ Parameters:
     Default: /prtimes-hackathon/google-client-secret
     Description: SecureString で置いた OAuth のシークレット. 値はここには書かない
 
-  # 上の2本を Parameter Store に置くまでは false。true にして値が無いとタスクが起動できない
+  # 値が無いのに true にするとタスクが起動できない
   GoogleCalendarEnabled:
     Type: String
     Default: "false"
@@ -132,6 +132,9 @@ Parameters:
     Description: >-
       1台あたり毎分このリクエスト数を超えると増やす.
       CPU 基準にしない: 応答の6〜8秒はほぼ OpenAI 待ちで CPU が動かず, 一生発火しない
+
+Conditions:
+  WithGoogleCalendar: !Equals [!Ref GoogleCalendarEnabled, "true"]
 
 Resources:
   # ===========================================================================

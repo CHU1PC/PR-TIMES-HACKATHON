@@ -87,7 +87,7 @@ def _event(item: dict) -> CalendarEvent | None:
     ends_at = end.get("dateTime", end.get("date"))
     identifier = item.get("id")
 
-    # 開始か終了が無い予定は画面に描けない。null を返さず落として非 null を保証する
+    # 描けない予定は落として非 null を保証する
     if not (identifier and starts_at and ends_at):
         return None
 

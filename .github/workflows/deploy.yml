@@ -120,7 +120,7 @@ jobs:
           verify=$(aws ssm get-parameter --name /prtimes-hackathon/origin-verify \
             --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$verify"
-          # 値を置くまでは連携を無効にしておく。true のまま値が無いとタスクが起動できない
+          # 値が無いのに true にするとタスクが起動できない
           if aws ssm get-parameter --name /prtimes-hackathon/google-client-id >/dev/null 2>&1; then
             echo "calendar=true" >> "$GITHUB_OUTPUT"
           else

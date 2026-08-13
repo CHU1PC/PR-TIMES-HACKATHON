@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         description="連携を終えたあとに戻す先",
     )
 
-    # カレンダーを使わないなら空でよい。空のまま /api/calendar/login を叩くと 503 で返す
+    # 使わないなら空でよい
     GOOGLE_CLIENT_ID: str = Field(default="", description="OAuth 2.0 のクライアント ID")
     GOOGLE_CLIENT_SECRET: SecretStr = Field(default=SecretStr(""), description="OAuth 2.0 のクライアントシークレット")
     GOOGLE_REDIRECT_URI: str = Field(
