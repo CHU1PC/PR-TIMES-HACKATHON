@@ -169,6 +169,17 @@
       "Resource": "*"
     },
     {
+      "Sid": "AlarmsCreatedByTargetTracking",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:GetMetricData"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "Logs",
       "Effect": "Allow",
       "Action": [
@@ -215,7 +226,8 @@
         "StringEquals": {
           "iam:AWSServiceName": [
             "ecs.amazonaws.com",
-            "elasticloadbalancing.amazonaws.com"
+            "elasticloadbalancing.amazonaws.com",
+            "ecs.application-autoscaling.amazonaws.com"
           ]
         }
       }
