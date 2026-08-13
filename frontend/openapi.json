@@ -1,6 +1,119 @@
 {
   "components": {
     "schemas": {
+      "CalendarEvent": {
+        "description": "カレンダーの予定1件。",
+        "properties": {
+          "description": {
+            "default": "",
+            "description": "予定の詳細",
+            "title": "Description",
+            "type": "string"
+          },
+          "end": {
+            "description": "終了。終日予定は日付だけになる",
+            "title": "End",
+            "type": "string"
+          },
+          "htmlLink": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Google カレンダーで開く URL",
+            "title": "Htmllink"
+          },
+          "id": {
+            "description": "Google 側の予定ID",
+            "title": "Id",
+            "type": "string"
+          },
+          "location": {
+            "default": "",
+            "description": "場所",
+            "title": "Location",
+            "type": "string"
+          },
+          "start": {
+            "description": "開始。終日予定は日付だけになる",
+            "title": "Start",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "confirmed / tentative / cancelled",
+            "title": "Status"
+          },
+          "title": {
+            "description": "予定の件名。無題なら (タイトルなし)",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start",
+          "end"
+        ],
+        "title": "CalendarEvent",
+        "type": "object"
+      },
+      "CalendarEvents": {
+        "description": "指定期間の予定。",
+        "properties": {
+          "connected": {
+            "description": "Google と連携済みか",
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "events": {
+            "description": "期間内の予定",
+            "items": {
+              "$ref": "#/components/schemas/CalendarEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "CalendarEvents",
+        "type": "object"
+      },
+      "CalendarStatus": {
+        "description": "連携しているかどうか。",
+        "properties": {
+          "configured": {
+            "description": "この環境で連携機能が使えるか。false なら連携ボタンを出さない",
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "connected": {
+            "description": "Google と連携済みか",
+            "title": "Connected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "connected"
+        ],
+        "title": "CalendarStatus",
+        "type": "object"
+      },
       "Candidate": {
         "description": "回答から抽出した予定候補。",
         "properties": {
@@ -45,7 +158,7 @@
         "type": "object"
       },
       "Case": {
-        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない（requirements §7）。",
+        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。",
         "properties": {
           "body_head": {
             "default": "",
@@ -138,7 +251,7 @@
           },
           "subtitle": {
             "default": "",
-            "description": "サブタイトル。lead_paragraph の代替（2026年の充填率74%）",
+            "description": "サブタイトル。lead_paragraph の代替(2026年の充填率74%)",
             "title": "Subtitle",
             "type": "string"
           },
@@ -462,7 +575,7 @@
             "type": "array"
           },
           "media": {
-            "description": "事例群を拾っていた媒体のうち特徴的なもの。件数は付けない（requirements §7）",
+            "description": "事例群を拾っていた媒体のうち特徴的なもの。件数は付けない(requirements §7)",
             "items": {
               "type": "string"
             },
@@ -692,9 +805,24 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/calendar/connection": {
+      "delete": {
+        "description": "連携を切る。保存した資格情報を消し, Google 側にも取り消しを伝える。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    204。セッション Cookie を消す。",
+        "operationId": "disconnect_api_calendar_connection_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disconnect",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
     "/api/calendar/events": {
       "post": {
-        "description": "指定期間の予定を返す。\n\nArgs:\n    query: 取得する期間。\n\nReturns:\n    connected と events。未連携なら events は空。",
+        "description": "ログイン中の本人の予定だけを返す。\n\nArgs:\n    query: 取得する期間。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    連携状態と予定。未連携なら events は空。",
         "operationId": "calendar_events_api_calendar_events_post",
         "requestBody": {
           "content": {
@@ -711,31 +839,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "boolean"
-                      },
-                      {
-                        "items": {
-                          "additionalProperties": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "type": "object"
-                        },
-                        "type": "array"
-                      }
-                    ]
-                  },
-                  "title": "Response Calendar Events Api Calendar Events Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CalendarEvents"
                 }
               }
             },
@@ -760,8 +864,8 @@
     },
     "/api/calendar/login": {
       "get": {
-        "description": "Google の同意画面へ送る。\n\nReturns:\n    認可 URL へのリダイレクト。",
-        "operationId": "calendar_login_api_calendar_login_get",
+        "description": "Google の同意画面へ送る。state はサーバに持たず Cookie で持ち回る。\n\nReturns:\n    認可 URL へのリダイレクト。\n\nRaises:\n    HTTPException: クライアント ID が設定されていないとき 503。",
+        "operationId": "start_oauth_api_calendar_login_get",
         "responses": {
           "200": {
             "content": {
@@ -772,7 +876,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Calendar Login",
+        "summary": "Start Oauth",
         "tags": [
           "calendar"
         ]
@@ -780,8 +884,8 @@
     },
     "/api/calendar/oauth/callback": {
       "get": {
-        "description": "認可コードを受け取ってトークンに交換する。\n\nArgs:\n    code: Google が返した認可コード。\n    state: 認可 URL を作ったときに渡した突き合わせ用の値。\n\nReturns:\n    フロントへのリダイレクト。\n\nRaises:\n    HTTPException: state が無いか, 対応する session が見つからないとき。",
-        "operationId": "calendar_callback_api_calendar_oauth_callback_get",
+        "description": "認可コードを交換し, ユーザーを作ってログインさせ, カレンダーのトークンを保存する。\n\nArgs:\n    request: state の Cookie とクライアント情報を読むために使う。\n    code: Google が返した認可コード。\n    state: Google が返した突き合わせ用の値。\n    db: データベースセッション。\n\nReturns:\n    フロントへのリダイレクト。セッション Cookie を載せる。\n\nRaises:\n    HTTPException: state が一致しないとき 400。交換や ID token の検証に失敗したとき 502。",
+        "operationId": "oauth_callback_api_calendar_oauth_callback_get",
         "parameters": [
           {
             "in": "query",
@@ -795,17 +899,10 @@
           {
             "in": "query",
             "name": "state",
-            "required": false,
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "State"
+              "title": "State",
+              "type": "string"
             }
           }
         ],
@@ -829,7 +926,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Calendar Callback",
+        "summary": "Oauth Callback",
         "tags": [
           "calendar"
         ]
@@ -837,18 +934,14 @@
     },
     "/api/calendar/status": {
       "get": {
-        "description": "連携済みかどうかを返す。\n\nReturns:\n    connected に連携状態。",
+        "description": "この環境で連携が使えるか, そしてこの人が連携済みかを返す。\n\n未ログインでも 401 にせず connected=false を返す。連携ボタンを出す判断に使うため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    設定状況と連携状況。",
         "operationId": "calendar_status_api_calendar_status_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Calendar Status Api Calendar Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CalendarStatus"
                 }
               }
             },
