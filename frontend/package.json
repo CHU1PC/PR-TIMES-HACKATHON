@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:openapi": "sh scripts/export-openapi.sh",
+    "generate:api": "bun run generate:openapi && kubb generate"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.21",
@@ -19,10 +21,16 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@kubb/cli": "4.39.3",
+    "@kubb/core": "4.39.3",
+    "@kubb/plugin-oas": "4.39.3",
+    "@kubb/plugin-ts": "4.39.3",
+    "@kubb/plugin-zod": "4.39.3",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "ajv": "^8.20.0",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
