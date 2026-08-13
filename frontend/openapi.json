@@ -958,6 +958,21 @@
         ]
       }
     },
+    "/api/calendar/logout": {
+      "post": {
+        "description": "セッションだけ切る。Google の資格情報は残すので, 入り直せばまた連携済みになる。\n\nセッションが既に切れていても 204 を返す。押しても何も起きない, を避けるため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    204。セッション Cookie を消す。",
+        "operationId": "logout_api_calendar_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
     "/api/calendar/oauth/callback": {
       "get": {
         "description": "認可コードを交換し, ユーザーを作ってログインさせ, カレンダーのトークンを保存する。\n\nArgs:\n    request: state の Cookie とクライアント情報を読むために使う。\n    code: Google が返した認可コード。\n    state: Google が返した突き合わせ用の値。\n    db: データベースセッション。\n\nReturns:\n    フロントへのリダイレクト。セッション Cookie を載せる。\n\nRaises:\n    HTTPException: state が一致しないとき 400。交換や ID token の検証に失敗したとき 502。",

@@ -229,6 +229,29 @@ async def demo_login(body: DemoLogin, request: Request, db: DbSessionDep) -> Res
     return response
 
 
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(request: Request, db: DbSessionDep) -> Response:
+    """セッションだけ切る。Google の資格情報は残すので, 入り直せばまた連携済みになる。
+
+    セッションが既に切れていても 204 を返す。押しても何も起きない, を避けるため。
+
+    Args:
+        request: セッション Cookie を読むために使う。
+        db: データベースセッション。
+
+    Returns:
+        204。セッション Cookie を消す。
+    """
+    token = request.cookies.get(SESSION_COOKIE)
+
+    if token:
+        await revoke_session(db, token)
+
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(SESSION_COOKIE, httponly=True, secure=settings.COOKIE_SECURE, samesite="lax")
+    return response
+
+
 @router.delete("/connection", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect(request: Request, user: CurrentUser, db: DbSessionDep) -> Response:
     """連携を切る。保存した資格情報を消し, Google 側にも取り消しを伝える。
