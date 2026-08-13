@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { calendarLoginUrl, calendarStatus, demoLogin, logout } from "@/api";
+import { calendarDisconnect, calendarLoginUrl, calendarStatus, demoLogin, logout } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Link } from "@/router";
 import type { CalendarStatus } from "@/types";
@@ -50,6 +50,14 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
     window.location.assign("/");
   };
 
+  const handleDisconnect = async () => {
+    if (pending) return;
+    setPending(true);
+    await calendarDisconnect();
+    setPending(false);
+    window.location.assign("/");
+  };
+
   const signedIn = status?.signed_in === true;
   // 未設定と分かっているときは出さない。押しても 503 になる
   const showGoogleLogin = checked && !signedIn && status?.configured !== false;
@@ -93,6 +101,18 @@ export function AppHeader({ currentPath }: AppHeaderProps) {
             <Icon name="calendar" size={19} />
             <span>Googleでログイン</span>
           </a>
+        ) : null}
+
+        {status?.connected === true ? (
+          <button
+            type="button"
+            className="app-header__action app-header__action--secondary"
+            onClick={() => void handleDisconnect()}
+            disabled={pending}
+          >
+            <Icon name="calendar" size={19} />
+            <span>Google連携を解除</span>
+          </button>
         ) : null}
 
         {signedIn ? (

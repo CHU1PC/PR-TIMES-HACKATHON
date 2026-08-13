@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import { Icon } from "@/components/Icon";
 import { formatDate, isValidDate } from "@/lib/date";
 import { loadHearing, loadSparring } from "@/lib/session";
-import { GoogleCalendar } from "@/components/GoogleCalendar";
 import { Link, navigate, useQueryParam } from "@/router";
 
 function sparringPath(title: string, startDate: string | null): string {
@@ -58,7 +57,6 @@ export function EntryPage() {
               <h2 className="entry__title">新しいPRネタを作る</h2>
             </div>
           </div>
-      <GoogleCalendar />
 
           <p className="entry__description">これからやることを1行で入力してください。詳しい中身は、このあと一緒に決めていきます。</p>
 
