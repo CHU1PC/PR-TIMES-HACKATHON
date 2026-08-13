@@ -1,4 +1,6 @@
-import { isHearingResponse, isProposalResponse, isSparringResponse } from "@/lib/guards";
+import type { z } from "zod";
+
+import { hearingResponseSchema, proposalResponseSchema, sparringResponseSchema } from "@/lib/schemas";
 import type {
   HearingResponse,
   HearingTurn,
@@ -49,7 +51,7 @@ function failureOf(error: unknown): ApiFailure {
 async function post<T>(
   path: string,
   body: unknown,
-  guard: (value: unknown) => value is T,
+  schema: z.ZodType<T>,
   signal?: AbortSignal,
   timeoutMs: number = TIMEOUT_MS,
 ): Promise<ApiResult<T>> {
@@ -65,21 +67,22 @@ async function post<T>(
     });
     if (!response.ok) return { ok: false, kind: "server", message: MESSAGES.server };
     const payload: unknown = await response.json();
-    if (!guard(payload)) return { ok: false, kind: "malformed", message: MESSAGES.malformed };
-    return { ok: true, data: payload };
+    const parsed = schema.safeParse(payload);
+    if (!parsed.success) return { ok: false, kind: "malformed", message: MESSAGES.malformed };
+    return { ok: true, data: parsed.data };
   } catch (error) {
     return { ok: false, ...failureOf(error) };
   }
 }
 
 export function sparringStep(turn: SparringTurn, signal?: AbortSignal): Promise<ApiResult<SparringResponse>> {
-  return post<SparringResponse>("/api/sparring/step", turn, isSparringResponse, signal);
+  return post<SparringResponse>("/api/sparring/step", turn, sparringResponseSchema, signal);
 }
 
 export function hearingStep(turn: HearingTurn, signal?: AbortSignal): Promise<ApiResult<HearingResponse>> {
-  return post<HearingResponse>("/api/hearing/step", turn, isHearingResponse, signal);
+  return post<HearingResponse>("/api/hearing/step", turn, hearingResponseSchema, signal);
 }
 
 export function fetchProposal(request: ProposalRequest, signal?: AbortSignal): Promise<ApiResult<ProposalResponse>> {
-  return post<ProposalResponse>("/api/proposal", request, isProposalResponse, signal, PROPOSAL_TIMEOUT_MS);
+  return post<ProposalResponse>("/api/proposal", request, proposalResponseSchema, signal, PROPOSAL_TIMEOUT_MS);
 }
