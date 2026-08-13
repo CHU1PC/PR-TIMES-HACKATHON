@@ -4,16 +4,17 @@ from typing import Final
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from google.oauth2.credentials import Credentials
+from loguru import logger
 
-from app.auth.google import SCOPES, TOKEN_ENDPOINT, save_credentials
+from app.auth.google import REVOKE_ENDPOINT, SCOPES, TOKEN_ENDPOINT, forget_credentials, save_credentials
 from app.auth.identities import upsert_user
-from app.auth.user_sessions import SESSION_COOKIE, SESSION_MAX_AGE, create_session
-from app.dependencies import DbSessionDep
+from app.auth.user_sessions import SESSION_COOKIE, SESSION_MAX_AGE, create_session, revoke_session
+from app.dependencies import CurrentUser, DbSessionDep
 from app.settings import settings
 
 # 経路はフロントとの契約なので /api/calendar のまま置く
@@ -175,4 +176,36 @@ async def oauth_callback(request: Request, code: str, state: str, db: DbSessionD
         samesite="lax",
     )
     response.delete_cookie(STATE_COOKIE, httponly=True, secure=settings.COOKIE_SECURE, samesite="lax")
+    return response
+
+
+@router.delete("/connection", status_code=status.HTTP_204_NO_CONTENT)
+async def disconnect(request: Request, user: CurrentUser, db: DbSessionDep) -> Response:
+    """連携を切る。保存した資格情報を消し, Google 側にも取り消しを伝える。
+
+    Args:
+        request: セッション Cookie を読むために使う。
+        user: セッションから復元したユーザー。
+        db: データベースセッション。
+
+    Returns:
+        204。セッション Cookie を消す。
+    """
+    refresh_token = await forget_credentials(db, user.id)
+
+    # Google 側に伝わらないと, 相手のアカウント設定にこのアプリが残り続ける。
+    # 失敗しても手元は消えているので, ここでは止めない
+    if refresh_token:
+        try:
+            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+                await client.post(REVOKE_ENDPOINT, data={"token": refresh_token})
+        except httpx.HTTPError:
+            logger.warning("Google への取り消しに失敗した。手元の資格情報は消えている")
+
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        await revoke_session(db, token)
+
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(SESSION_COOKIE, httponly=True, secure=settings.COOKIE_SECURE, samesite="lax")
     return response
