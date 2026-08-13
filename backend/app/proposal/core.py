@@ -20,7 +20,7 @@ CATEGORIES_SQL = text("SELECT business_category_name, business_category_id FROM 
 # 事例をこの件数まで渡す。増やすほど LLM が薄い共通点を拾いに行くので絞る
 TOP_K = 8
 
-# 業種は数百件と小さいので初回に読み切って使い回す（async 関数には functools.cache が使えない）
+# 業種は数百件と小さいので初回に読み切って使い回す(async 関数には functools.cache が使えない)
 _categories: dict[str, int] = {}
 
 _category_chain: Runnable[dict[str, str], CategoryPick] = CATEGORY_PROMPT | chatgpt.with_structured_output(CategoryPick)

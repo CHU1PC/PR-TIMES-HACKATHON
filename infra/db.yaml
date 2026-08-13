@@ -61,7 +61,7 @@ Resources:
           Value: prtimes-hackathon
 
   # inbound は矢印1本につき1つ。ここでは投入用の踏み台ぶんだけ作り,
-  # タスクからの1本は app スタックが足す（SG の相互参照を避けるため）
+  # タスクからの1本は app スタックが足す(SG の相互参照を避けるため)
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:

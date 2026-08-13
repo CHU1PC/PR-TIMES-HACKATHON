@@ -15,7 +15,7 @@ MIN_SHORT_LENGTH = 2
 PLACES_SQL = text("SELECT kind, name, prefecture_id FROM places ORDER BY prefecture_id, name")
 
 
-# places は数千行と小さいので初回に読み切って使い回す（async 関数には functools.cache が使えない）
+# places は数千行と小さいので初回に読み切って使い回す(async 関数には functools.cache が使えない)
 _prefectures: dict[str, int] = {}
 _cities: list[tuple[str, int]] = []
 _lock = asyncio.Lock()

@@ -8,7 +8,7 @@ from app.db import session
 PER_CASE = 4
 OVERALL = 6
 
-# この割合を超える事例に出ている媒体は, 何を書いても載る媒体とみなして落とす（実測の下駄・§8.3）
+# この割合を超える事例に出ている媒体は, 何を書いても載る媒体とみなして落とす(実測の下駄・§8.3)
 UBIQUITOUS_RATIO = 0.5
 
 # 媒体ごとの出現事例数は media_frequency に, その分母は media_total に入れてある。

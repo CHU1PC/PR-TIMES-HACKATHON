@@ -4,12 +4,12 @@ from app.schema.sparring import PlanDraft
 
 
 class Case(BaseModel):
-    """コーパスから引いた過去の1件。reach は顧客画面に出さない（requirements §7）。"""
+    """コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。"""
 
     company_id: int = Field(description="PR TIMES 側の企業ID")
     release_id: int = Field(description="企業内でのリリースID")
     title: str = Field(description="リリースのタイトル")
-    subtitle: str = Field(default="", description="サブタイトル。lead_paragraph の代替（2026年の充填率74%）")
+    subtitle: str = Field(default="", description="サブタイトル。lead_paragraph の代替(2026年の充填率74%)")
     body_head: str = Field(default="", description="本文冒頭をHTML除去して1000文字。全文は定型文が大半で取らない")
     company_name: str | None = Field(default=None, description="配信企業名")
     business_category: str | None = Field(default=None, description="業種名")
@@ -18,7 +18,7 @@ class Case(BaseModel):
     city: str | None = Field(default=None, description="市区町村名")
     published_on: str = Field(description="配信日 YYYY-MM-DD")
 
-    # exclude=True で JSON に載せない。応答に含めると画面に出す余地が残る（requirements §7）
+    # exclude=True で JSON に載せない。応答に含めると画面に出す余地が残る(requirements §7)
     reach: int = Field(exclude=True, description="転載したユニーク媒体数。並び替えにだけ使う")
     similarity: float = Field(exclude=True, description="クエリとのコサイン類似度。並び替えにだけ使う")
     media: list[str] = Field(default_factory=list[str], description="この事例を拾った媒体のうち特徴的なもの")
@@ -31,7 +31,7 @@ class Suggestion(BaseModel):
     reason: str = Field(description="なぜそれが効くか。事例に即して書く")
     cited: list[int] = Field(
         default_factory=list[int],
-        # release_id は企業をまたいで重複する（実測3,352個）ので指し先に使えない
+        # release_id は企業をまたいで重複する(実測3,352個)ので指し先に使えない
         description="根拠にした事例。cases 配列の位置を指す0始まりの添字",
     )
 
@@ -49,5 +49,5 @@ class ProposalResponse(BaseModel):
     cases: list[Case] = Field(description="根拠にした事例")
     media: list[str] = Field(
         default_factory=list[str],
-        description="事例群を拾っていた媒体のうち特徴的なもの。件数は付けない（requirements §7）",
+        description="事例群を拾っていた媒体のうち特徴的なもの。件数は付けない(requirements §7)",
     )

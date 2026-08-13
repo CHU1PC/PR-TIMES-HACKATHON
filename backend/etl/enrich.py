@@ -47,7 +47,7 @@ TEXT_SQL = """
       ON r.company_id = t.company_id AND r.release_id = t.release_id
 """
 
-# 媒体名は new_site_name（site_name は運営会社名）。転載元の PR TIMES 自身は除く
+# 媒体名は new_site_name(site_name は運営会社名)。転載元の PR TIMES 自身は除く
 MEDIA_SQL = """
     SELECT DISTINCT w.company_id, w.release_id, w.new_site_name
     FROM webclipping_list w

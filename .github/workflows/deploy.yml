@@ -1,7 +1,7 @@
 name: deploy
 
 # バックエンドを ECR へ積み、CloudFormation で AWS の構成を更新し、フロントを S3 へ配る。
-# main への push（docs と md を除く）と手動実行で発火。
+# main への push(docs と md を除く)と手動実行で発火。
 # AWS の認証は OIDC で、長期キーは持たない。ロールを引けるのは deploy ジョブだけ。
 # スキーマは ECS の使い捨てタスクが alembic で合わせる。RDS は VPC の外から届かない。
 # db スタックとコーパスの投入はここでは流さない。手元から行う。
@@ -71,7 +71,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: ECR スタックを作る（無ければ）
+      - name: ECR スタックを作る(無ければ)
         run: |
           aws cloudformation deploy \
             --template-file infra/ecr.yaml \
@@ -91,7 +91,7 @@ jobs:
           echo "uri=$uri" >> "$GITHUB_OUTPUT"
 
       # CLOUDFRONT スコープの WebACL は us-east-1 にしか作れない
-      - name: WAF スタックを流す（us-east-1）
+      - name: WAF スタックを流す(us-east-1)
         run: |
           aws cloudformation deploy --region us-east-1 \
             --template-file infra/waf.yaml \
