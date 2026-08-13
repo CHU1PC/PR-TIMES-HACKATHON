@@ -5,6 +5,8 @@ export { calendarEventsSchema } from "./calendarEventsSchema.ts";
 export { calendarStatusApiCalendarStatusGet200Schema, calendarStatusApiCalendarStatusGetQueryResponseSchema } from "./calendarStatusApiCalendarStatusGetSchema.ts";
 export { calendarStatusSchema } from "./calendarStatusSchema.ts";
 export { candidateSchema } from "./candidateSchema.ts";
+export { demoLoginApiCalendarDemoLoginPost204Schema, demoLoginApiCalendarDemoLoginPost422Schema, demoLoginApiCalendarDemoLoginPostMutationRequestSchema, demoLoginApiCalendarDemoLoginPostMutationResponseSchema } from "./demoLoginApiCalendarDemoLoginPostSchema.ts";
+export { demoLoginSchema } from "./demoLoginSchema.ts";
 export { disconnectApiCalendarConnectionDelete204Schema, disconnectApiCalendarConnectionDeleteMutationResponseSchema } from "./disconnectApiCalendarConnectionDeleteSchema.ts";
 export { eventQuerySchema } from "./eventQuerySchema.ts";
 export { exchangeSchema } from "./exchangeSchema.ts";

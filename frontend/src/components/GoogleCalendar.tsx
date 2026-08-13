@@ -40,13 +40,13 @@ export function GoogleCalendar() {
       return;
     }
     setStatus(current.data);
-    if (!current.data.configured || !current.data.connected) return;
+    if (!current.data.signed_in) return;
 
     const result = await calendarEvents(currentRange(), controller.signal);
     if (controller.signal.aborted) return;
     if (!result.ok) {
-      // セッション切れは異常ではなく未連携。赤く出さずに連携ボタンへ戻す
-      if (result.kind === "unauthorized") setStatus({ ...current.data, connected: false });
+      // セッション切れは異常ではなく未ログイン。赤く出さずにログインへ戻す
+      if (result.kind === "unauthorized") setStatus({ ...current.data, signed_in: false });
       else if (result.kind !== "cancelled") setFailure(result);
       return;
     }
@@ -98,10 +98,11 @@ export function GoogleCalendar() {
     );
   }
 
-  // 確認中と未設定は何も描かない。未設定は本番の既定なので, 出すと入口に説明の要る枠が居座る
-  if (status === null || !status.configured) return null;
+  // 確認中と未ログインは何も描かない。ログインはヘッダーに置いてある
+  if (status === null || !status.signed_in) return null;
 
-  if (!status.connected) {
+  // ログイン済みだが Google は未連携。自分で足した予定は下のカレンダーに出る
+  if (!status.connected && status.configured) {
     return (
       <section className="calendar">
         <h2 className="calendar__title">Googleカレンダー</h2>

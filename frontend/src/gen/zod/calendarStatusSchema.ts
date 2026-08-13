@@ -6,9 +6,11 @@
 import { z } from "zod/v4";
 
 /**
- * @description 連携しているかどうか。
+ * @description ログインと連携の状況。
  */
 export const calendarStatusSchema = z.object({
-    "configured": z.boolean().describe("この環境で連携機能が使えるか。false なら連携ボタンを出さない"),
-"connected": z.boolean().describe("Google と連携済みか")
-    }).describe("連携しているかどうか。")
+    "configured": z.boolean().describe("この環境で Google 連携が使えるか。false なら連携ボタンを出さない"),
+"connected": z.boolean().describe("Google と連携済みか。デモでログインしただけなら false"),
+"demo": z.boolean().describe("Google なしのデモログインを開いているか。false ならボタンを出さない"),
+"signed_in": z.boolean().describe("ログイン済みか。予定を引けるかはこれで決まる")
+    }).describe("ログインと連携の状況。")

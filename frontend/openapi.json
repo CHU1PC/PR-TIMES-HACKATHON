@@ -76,12 +76,12 @@
         "description": "指定期間の予定。",
         "properties": {
           "connected": {
-            "description": "Google と連携済みか",
+            "description": "Google と連携済みか。デモでログインしただけなら false",
             "title": "Connected",
             "type": "boolean"
           },
           "events": {
-            "description": "期間内の予定",
+            "description": "期間内の予定。Google の分と自分で足した分の両方",
             "items": {
               "$ref": "#/components/schemas/CalendarEvent"
             },
@@ -97,22 +97,34 @@
         "type": "object"
       },
       "CalendarStatus": {
-        "description": "連携しているかどうか。",
+        "description": "ログインと連携の状況。",
         "properties": {
           "configured": {
-            "description": "この環境で連携機能が使えるか。false なら連携ボタンを出さない",
+            "description": "この環境で Google 連携が使えるか。false なら連携ボタンを出さない",
             "title": "Configured",
             "type": "boolean"
           },
           "connected": {
-            "description": "Google と連携済みか",
+            "description": "Google と連携済みか。デモでログインしただけなら false",
             "title": "Connected",
+            "type": "boolean"
+          },
+          "demo": {
+            "description": "Google なしのデモログインを開いているか。false ならボタンを出さない",
+            "title": "Demo",
+            "type": "boolean"
+          },
+          "signed_in": {
+            "description": "ログイン済みか。予定を引けるかはこれで決まる",
+            "title": "Signed In",
             "type": "boolean"
           }
         },
         "required": [
+          "signed_in",
           "configured",
-          "connected"
+          "connected",
+          "demo"
         ],
         "title": "CalendarStatus",
         "type": "object"
@@ -158,6 +170,25 @@
           "reason"
         ],
         "title": "Candidate",
+        "type": "object"
+      },
+      "DemoLogin": {
+        "description": "デモでログインする人。名前だけで identity を作る。",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "表示名。空なら既定の名前を使う",
+            "title": "Name"
+          }
+        },
+        "title": "DemoLogin",
         "type": "object"
       },
       "EventQuery": {
@@ -830,9 +861,44 @@
         ]
       }
     },
+    "/api/calendar/demo-login": {
+      "post": {
+        "description": "Google を通さず名前だけでログインする。初めての名前なら予定を積んで返す。\n\nArgs:\n    body: 表示名。空なら既定の名前を使う。\n    request: user-agent と接続元をセッションに残すために使う。\n    db: データベースセッション。\n\nReturns:\n    204。セッション Cookie を張る。\n\nRaises:\n    HTTPException: APP_ENV が demo でないとき。",
+        "operationId": "demo_login_api_calendar_demo_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Login",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
     "/api/calendar/events": {
       "post": {
-        "description": "ログイン中の本人の予定だけを返す。\n\nArgs:\n    query: 取得する期間。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    連携状態と予定。未連携なら events は空。",
+        "description": "ログイン中の本人の予定だけを返す。\n\nArgs:\n    query: 取得する期間。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    Google の連携状態と予定。連携していなくても自分で足した予定は返る。",
         "operationId": "calendar_events_api_calendar_events_post",
         "requestBody": {
           "content": {
@@ -944,7 +1010,7 @@
     },
     "/api/calendar/status": {
       "get": {
-        "description": "この環境で連携が使えるか, そしてこの人が連携済みかを返す。\n\n未ログインでも 401 にせず connected=false を返す。連携ボタンを出す判断に使うため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    設定状況と連携状況。",
+        "description": "ログイン済みか, この環境で連携が使えるか, この人が連携済みかを返す。\n\n未ログインでも 401 にせず signed_in=false を返す。ログインボタンを出す判断に使うため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    ログインと連携の状況。",
         "operationId": "calendar_status_api_calendar_status_get",
         "responses": {
           "200": {

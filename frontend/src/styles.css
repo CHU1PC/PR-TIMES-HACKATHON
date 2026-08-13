@@ -281,6 +281,22 @@ textarea:focus-visible {
   color: var(--accent);
 }
 
+.demo-login {
+  align-items: center;
+  display: flex;
+  flex: 0 1 auto;
+  gap: 8px;
+}
+
+.demo-login__input {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 7px 10px;
+  width: 132px;
+}
+
 .app-header__action--secondary:hover {
   box-shadow: 0 8px 18px rgba(0, 0, 139, 0.1);
 }

@@ -11,12 +11,12 @@ import type { CalendarEvent } from "./CalendarEvent.ts";
 */
 export type CalendarEvents = {
     /**
-     * @description Google と連携済みか
+     * @description Google と連携済みか。デモでログインしただけなら false
      * @type boolean
     */
     connected: boolean;
     /**
-     * @description 期間内の予定
+     * @description 期間内の予定。Google の分と自分で足した分の両方
      * @type array
     */
     events: CalendarEvent[];

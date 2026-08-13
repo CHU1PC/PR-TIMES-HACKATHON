@@ -1,0 +1,1 @@
+{"description":"デモでログインする人。名前だけで identity を作る。","properties":{"name":{"anyOf":[{"type":"string"},{"type":"null"}],"description":"表示名。空なら既定の名前を使う","title":"Name"}},"title":"DemoLogin","type":"object","x-readme-ref-name":"DemoLogin"}

@@ -4,6 +4,8 @@ export type { CalendarEventsApiCalendarEventsPost200, CalendarEventsApiCalendarE
 export type { CalendarStatus } from "./CalendarStatus.ts";
 export type { CalendarStatusApiCalendarStatusGet200, CalendarStatusApiCalendarStatusGetQuery, CalendarStatusApiCalendarStatusGetQueryResponse } from "./CalendarStatusApiCalendarStatusGet.ts";
 export type { Candidate, CandidateCategoryEnumKey } from "./Candidate.ts";
+export type { DemoLogin } from "./DemoLogin.ts";
+export type { DemoLoginApiCalendarDemoLoginPost204, DemoLoginApiCalendarDemoLoginPost422, DemoLoginApiCalendarDemoLoginPostMutation, DemoLoginApiCalendarDemoLoginPostMutationRequest, DemoLoginApiCalendarDemoLoginPostMutationResponse } from "./DemoLoginApiCalendarDemoLoginPost.ts";
 export type { DisconnectApiCalendarConnectionDelete204, DisconnectApiCalendarConnectionDeleteMutation, DisconnectApiCalendarConnectionDeleteMutationResponse } from "./DisconnectApiCalendarConnectionDelete.ts";
 export type { EventQuery } from "./EventQuery.ts";
 export type { Exchange } from "./Exchange.ts";

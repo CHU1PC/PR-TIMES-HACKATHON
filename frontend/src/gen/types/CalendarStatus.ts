@@ -6,17 +6,27 @@
 
 /**
  * CalendarStatus
- * @description 連携しているかどうか。
+ * @description ログインと連携の状況。
 */
 export type CalendarStatus = {
     /**
-     * @description この環境で連携機能が使えるか。false なら連携ボタンを出さない
+     * @description この環境で Google 連携が使えるか。false なら連携ボタンを出さない
      * @type boolean
     */
     configured: boolean;
     /**
-     * @description Google と連携済みか
+     * @description Google と連携済みか。デモでログインしただけなら false
      * @type boolean
     */
     connected: boolean;
+    /**
+     * @description Google なしのデモログインを開いているか。false ならボタンを出さない
+     * @type boolean
+    */
+    demo: boolean;
+    /**
+     * @description ログイン済みか。予定を引けるかはこれで決まる
+     * @type boolean
+    */
+    signed_in: boolean;
 };

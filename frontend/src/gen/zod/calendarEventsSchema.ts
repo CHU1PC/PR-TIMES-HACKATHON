@@ -10,8 +10,8 @@ import { z } from "zod/v4";
  * @description 指定期間の予定。
  */
 export const calendarEventsSchema = z.object({
-    "connected": z.boolean().describe("Google と連携済みか"),
+    "connected": z.boolean().describe("Google と連携済みか。デモでログインしただけなら false"),
 get "events"(){
-                return z.array(calendarEventSchema.describe("カレンダーの予定1件。")).describe("期間内の予定")
+                return z.array(calendarEventSchema.describe("カレンダーの予定1件。")).describe("期間内の予定。Google の分と自分で足した分の両方")
               }
     }).describe("指定期間の予定。")

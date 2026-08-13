@@ -4,6 +4,8 @@ export type { CalendarEventsApiCalendarEventsPost200, CalendarEventsApiCalendarE
 export type { CalendarStatus } from "./types/CalendarStatus.ts";
 export type { CalendarStatusApiCalendarStatusGet200, CalendarStatusApiCalendarStatusGetQuery, CalendarStatusApiCalendarStatusGetQueryResponse } from "./types/CalendarStatusApiCalendarStatusGet.ts";
 export type { Candidate, CandidateCategoryEnumKey } from "./types/Candidate.ts";
+export type { DemoLogin } from "./types/DemoLogin.ts";
+export type { DemoLoginApiCalendarDemoLoginPost204, DemoLoginApiCalendarDemoLoginPost422, DemoLoginApiCalendarDemoLoginPostMutation, DemoLoginApiCalendarDemoLoginPostMutationRequest, DemoLoginApiCalendarDemoLoginPostMutationResponse } from "./types/DemoLoginApiCalendarDemoLoginPost.ts";
 export type { DisconnectApiCalendarConnectionDelete204, DisconnectApiCalendarConnectionDeleteMutation, DisconnectApiCalendarConnectionDeleteMutationResponse } from "./types/DisconnectApiCalendarConnectionDelete.ts";
 export type { EventQuery } from "./types/EventQuery.ts";
 export type { Exchange } from "./types/Exchange.ts";
@@ -39,6 +41,8 @@ export { calendarEventsSchema } from "./zod/calendarEventsSchema.ts";
 export { calendarStatusApiCalendarStatusGet200Schema, calendarStatusApiCalendarStatusGetQueryResponseSchema } from "./zod/calendarStatusApiCalendarStatusGetSchema.ts";
 export { calendarStatusSchema } from "./zod/calendarStatusSchema.ts";
 export { candidateSchema } from "./zod/candidateSchema.ts";
+export { demoLoginApiCalendarDemoLoginPost204Schema, demoLoginApiCalendarDemoLoginPost422Schema, demoLoginApiCalendarDemoLoginPostMutationRequestSchema, demoLoginApiCalendarDemoLoginPostMutationResponseSchema } from "./zod/demoLoginApiCalendarDemoLoginPostSchema.ts";
+export { demoLoginSchema } from "./zod/demoLoginSchema.ts";
 export { disconnectApiCalendarConnectionDelete204Schema, disconnectApiCalendarConnectionDeleteMutationResponseSchema } from "./zod/disconnectApiCalendarConnectionDeleteSchema.ts";
 export { eventQuerySchema } from "./zod/eventQuerySchema.ts";
 export { exchangeSchema } from "./zod/exchangeSchema.ts";
