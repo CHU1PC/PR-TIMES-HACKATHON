@@ -1,24 +1,23 @@
-# EC2 上の他チームのコンテナと衝突しないよう project 名を固定する
 name: prtimes-hackathon
 
 services:
-  app:
+  backend:
     build:
       context: ./backend
-    container_name: prtimes-hackathon-app
-    env_file: .env
+    container_name: prtimes-hackathon-backend
     environment:
+      # 本番でタスク定義が渡すものと同じ2つ。Parameter Store から注入される
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?.env に OPENAI_API_KEY が無い}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?.env に ALLOWED_ORIGINS が無い}
       # glibc malloc arena 数を制限して RSS 単調増加を抑える
       MALLOC_ARENA_MAX: "2"
     ports:
-      # 80 は pgAdmin (gunicorn) が使用中. 絶対に奪わない
       - "8000:8000"
     restart: unless-stopped
-    # t3.medium は 3.7GB を pgAdmin と分け合う. アプリ側が食い潰さないよう上限を切る
-    mem_limit: 1500m
+    # タスク定義の memory と揃える。本番で落ちる前にローカルで OOM を踏む
+    mem_limit: 1024m
     logging:
       driver: json-file
       options:
-        # デモ中にディスクを食わないよう 10MB x 3 で打ち止め
         max-size: "10m"
         max-file: "3"
