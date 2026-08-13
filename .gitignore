@@ -21,6 +21,9 @@ dist/
 data/
 
 # misc
+# draw.io が編集中に作る退避ファイル
+.$*.drawio.bkp
+.$*.drawio.dtmp
 .DS_Store
 *.log
 
