@@ -1,0 +1,27 @@
+# EC2 上の他チームのコンテナと衝突しないよう project 名を固定する
+name: prtimes-hackathon
+
+services:
+  app:
+    build:
+      context: ./backend
+      # frontend/ は backend/ の外. ルートを context にすると data/ (700MB 超) まで送られる
+      additional_contexts:
+        frontend: ./frontend
+    container_name: prtimes-hackathon-app
+    env_file: .env
+    environment:
+      # glibc malloc arena 数を制限して RSS 単調増加を抑える
+      MALLOC_ARENA_MAX: "2"
+    ports:
+      # 80 は pgAdmin (gunicorn) が使用中. 絶対に奪わない
+      - "8080:8080"
+    restart: unless-stopped
+    # t3.medium は 3.7GB を pgAdmin と分け合う. アプリ側が食い潰さないよう上限を切る
+    mem_limit: 1500m
+    logging:
+      driver: json-file
+      options:
+        # デモ中にディスクを食わないよう 10MB x 3 で打ち止め
+        max-size: "10m"
+        max-file: "3"
