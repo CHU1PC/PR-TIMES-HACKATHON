@@ -32,6 +32,18 @@ class CalendarStatus(BaseModel):
     demo: bool = Field(description="Google なしのデモログインを開いているか。false ならボタンを出さない")
 
 
+class EventCreate(BaseModel):
+    """画面から足す予定1件。時刻は RFC3339 で受ける。"""
+
+    title: str = Field(min_length=1, max_length=255, description="予定の件名")
+    description: str = Field(default="", description="予定の詳細。無ければ空文字")
+    all_day: bool = Field(default=False, alias="allDay", description="終日の予定か")
+    starts_at: str = Field(alias="startsAt", description="開始 (RFC3339)")
+    ends_at: str = Field(alias="endsAt", description="終了 (RFC3339)")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DemoLogin(BaseModel):
     """デモでログインする人。名前だけで identity を作る。"""
 

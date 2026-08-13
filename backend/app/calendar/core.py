@@ -9,7 +9,7 @@ from sqlmodel import col
 
 from app.auth.google import load_credentials
 from app.db.models import Event
-from app.schema.calendar import CalendarEvent
+from app.schema.calendar import CalendarEvent, EventCreate
 
 MAX_EVENTS: Final = 250
 
@@ -64,6 +64,34 @@ def _stored(row: Event) -> CalendarEvent:
         html_link=None,
         status="confirmed",
     )
+
+
+async def create_event(db: AsyncSession, user_id: UUID, payload: EventCreate) -> CalendarEvent:
+    """画面から足された予定を保存する。
+
+    Args:
+        db: データベースセッション。
+        user_id: 予定の持ち主。
+        payload: 画面から来た内容。
+
+    Returns:
+        保存した予定。
+    """
+    row = Event(
+        user_id=user_id,
+        title=payload.title,
+        description=payload.description,
+        location="",
+        starts_at=datetime.fromisoformat(payload.starts_at),
+        ends_at=datetime.fromisoformat(payload.ends_at),
+        all_day=payload.all_day,
+    )
+
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+
+    return _stored(row)
 
 
 async def stored_events(
