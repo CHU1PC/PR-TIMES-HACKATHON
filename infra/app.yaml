@@ -356,6 +356,15 @@ Resources:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
 
+              # SecureString の復号。AWS 管理鍵なら鍵ポリシー側で許可されるはずだが,
+              # 外れるとタスクが起動できないので明示する。SSM 経由の復号だけに限る
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
+
   # アプリが引くロール。外に出るのは OpenAI だけで AWS API は叩かないので中身は空
   TaskRole:
     Type: AWS::IAM::Role
