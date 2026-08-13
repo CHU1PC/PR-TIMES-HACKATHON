@@ -43,3 +43,21 @@ async def session() -> AsyncGenerator[AsyncSession]:
     """
     async with AsyncSession(engine(), expire_on_commit=False) as opened:
         yield opened
+
+
+async def get_db_session() -> AsyncGenerator[AsyncSession]:
+    """FastAPI の依存として1リクエスト1セッションを配る。
+
+    例外時は明示的に rollback する。中途半端な変更を接続プールに戻さない。
+
+    Yields:
+        非同期セッション。
+    """
+    opened = AsyncSession(engine(), expire_on_commit=False)
+    try:
+        yield opened
+    except BaseException:
+        await opened.rollback()
+        raise
+    finally:
+        await opened.close()
