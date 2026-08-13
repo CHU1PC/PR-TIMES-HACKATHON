@@ -708,10 +708,10 @@ textarea:focus-visible {
   color: #285ba8;
 }
 
+/* 高さを固定すると1日に2件入ったときに2件目がセルから溢れる。最低限だけ決めて伸ばす */
 .calendar-table td {
   border-right: 1px solid var(--line);
   border-top: 1px solid var(--line);
-  height: 84px;
   padding: 0;
   vertical-align: top;
 }
