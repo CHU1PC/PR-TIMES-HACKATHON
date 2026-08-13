@@ -406,18 +406,23 @@ industry / ipo_type / business_category / keyword / prefecture / city / location
 
 ## 10. アーキテクチャ
 
-```
-[ブラウザ] ── HTTP ──> [FastAPI (EC2:8080)] ──> [OpenAI API]
-                            └ Vite のビルド成果物を同一オリジンで静的配信
+```text
+[ブラウザ] ─ HTTPS ─> [CloudFront] ┬─ /*     ─> [S3]  フロントの dist
+                                    └─ /api/* ─> [ALB] ─> [ECS Fargate]
+                                                            FastAPI :8000
+                                                              ├─> [RDS + pgvector]  コーパス検索
+                                                              └─> [OpenAI API]      埋め込みと生成
 
-[RDS]     ← ETL のときだけ読む。アプリは接続しない
-[DuckDB]  ← 分析専用。判定クエリを回す場所。アプリは参照しない
+[主催者の RDS] ← ETL のときだけ読む。アプリは接続しない
+[DuckDB]       ← ETL 専用。コーパスを選抜する場所。アプリは参照しない
 ```
 
-- **アプリの外部依存は OpenAI だけ。** RDS も DuckDB も実行時には使わない
-- LLM にさせるのは**入力の構造化と質問の日本語化**のみ。数値には触らせない
-- 状態を持たないので、コンテナは1つ。nginx も要らない
-- ポート: 80 = pgAdmin（潰さない） / **8080 = 本アプリ**
+- **実行時の依存は アプリ用 RDS と OpenAI の2つ。** 主催者の RDS と DuckDB は ETL のときだけ
+- LLM にさせるのは**入力の構造化・質問の日本語化・提案の文面**のみ。数値と媒体名には触らせない
+- フロントとバックエンドは CloudFront が同一オリジンで配るので、本番で CORS は効かない
+- ポート: 80 = pgAdmin（潰さない） / **8000 = 本アプリ**（ローカルもコンテナも同じ）
+
+構成の詳細は [infra.md](infra.md)、図は [architecture.drawio](architecture.drawio)。
 
 ### エンドポイント
 
@@ -426,25 +431,33 @@ industry / ipo_type / business_category / keyword / prefecture / city / location
 | GET | `/api/health` | 疎通確認。DB にも LLM にも触らない |
 | POST | `/api/sparring/step` | 壁打ちを1往復進める |
 | POST | `/api/hearing/step` | 聞き取りを1往復進める |
-| GET | `/{path}` | 静的配信（SPA fallback） |
+| POST | `/api/proposal` | 固まった予定に対し, 事例を引いて足せる行動を3つ返す |
 
 ### ディレクトリ
 
-```
+```text
 backend/app/
-  main.py              FastAPI 生成・CORS・静的配信
+  main.py              FastAPI 生成・CORS
   router/  router.py   集約（include するだけ）
-           health.py  hearing.py  sparring.py     ← HTTP 層
-  hearing/  core.py                               ← ドメイン層（router と対）
+           health.py  hearing.py  sparring.py  proposal.py    ← HTTP 層
+  hearing/  core.py                                           ← ドメイン層（router と対）
   sparring/ core.py  slots.py
-  llm/     openai_gpt.py                          ← モデル定義
-           hearing/  prompts.py  schema.py        ← プロンプトとスキーマは独立ファイル
+  proposal/ core.py                                           ← 事例を引いて提案を作る
+  retrieval/ index.py  media.py  place.py                     ← pgvector 検索と媒体の絞り込み
+  llm/     openai_gpt.py  embeddings.py                       ← モデル定義
+           hearing/  prompts.py  schema.py                    ← プロンプトとスキーマは独立ファイル
            sparring/ prompts.py  schema.py
-  schema/  plan.py  hearing.py  sparring.py       ← API の型
-  db/      conninfo.py                            ← RDS 参照（現在アプリからは未使用）
+           proposal/ prompts.py  schema.py
+  schema/  plan.py  hearing.py  sparring.py  proposal.py      ← API の型
+  db/      models.py  session.py                              ← SQLModel の定義と非同期セッション
   settings/ config.py  constants.py  paths.py
-backend/etl/  db.py  extract.py  load_duckdb.py
-frontend/src/ ...                                  ← Vite + React + TypeScript
+backend/alembic/  env.py  versions/                           ← スキーマの版管理
+backend/etl/  db.py  extract.py  load_duckdb.py               ← 主催者 RDS → DuckDB
+              corpus.py  enrich.py  embed.py                  ← コーパス選抜・本文合流・埋め込み
+              load_corpus.py                                  ← コーパス → アプリ用 RDS
+infra/        github-oidc.yaml  ecr.yaml  db.yaml  app.yaml   ← CloudFormation
+.github/workflows/deploy.yml                                  ← main への push で走る
+frontend/src/ ...                                             ← Vite + React + TypeScript
 ```
 
 ---
@@ -458,9 +471,10 @@ frontend/src/ ...                                  ← Vite + React + TypeScript
 | S1 | 壁打ち（バックエンド） | **完了。** 実 API で検証済み |
 | S2 | ヒアリング（バックエンド） | **完了。** 実 API で検証済み |
 | S3 | router 層 + FastAPI | **完了。** HTTP 経由で動作確認済み |
-| S4 | フロント（3画面・実API結線） | 進行中 |
-| S5 | Docker + EC2 デプロイ | 進行中 |
-| S6 | 判定クエリの複数業種での再現確認 | 未着手 |
+| S4 | フロント（実API結線） | **完了** |
+| S5 | RAG（コーパス12.9万件・pgvector 検索・提案生成） | **完了。** 実 RDS で検証済み |
+| S6 | CloudFormation + GitHub Actions でのデプロイ | 進行中 |
+| S7 | 判定クエリの複数業種での再現確認 | 未着手 |
 
 ### ETL の設計上の要点
 
@@ -580,17 +594,20 @@ ssh -i <key.pem> -N \
   -L 15432:prtimes-hackathon-2026summer-db.cnum2840eavk.ap-northeast-1.rds.amazonaws.com:5432 \
   ubuntu@13.112.91.188
 
-# ETL（DATABASE_URL はトンネルを指す）
+# ETL（DATABASE_URL はトンネルを指す。一度きり・実行済み）
 cd backend
-uv run --env-file ../.env python -m etl.extract
-uv run --env-file ../.env python -m etl.load_duckdb
+uv run --group etl --env-file ../.env python -m etl.extract
+uv run --group etl --env-file ../.env python -m etl.load_duckdb
 
 # API（ローカル）
-uv run --env-file ../.env uvicorn app.main:app --port 8080
+uv run --env-file ../.env fastapi dev
 
 # フロント（別ターミナル）
 cd frontend && bun install && bun run dev
 ```
 
+`proposal` はアプリ用 RDS を読むので、`DATABASE_URL` をそちらのトンネルに向ける
+（[infra.md](infra.md) の「手元から RDS を見る」）。壁打ちとヒアリングだけなら DB は要らない。
+
 **自宅IPが変わると EC2 に届かなくなる。** `curl -4 -s ifconfig.me` で確認し、
-セキュリティグループ `sg-03555db1c40d124bf` の 22/80/8080 を張り替える（`docs/infra.md`）。
+セキュリティグループ `sg-03555db1c40d124bf` の 22 番を張り替える（[infra.md](infra.md)）。
