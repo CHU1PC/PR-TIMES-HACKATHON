@@ -2,14 +2,7 @@ from typing import Final
 
 from app.schema import SlotCode
 
-# 埋める順。先頭ほど先に聞く。
-#
-# place を最優先にする根拠は実測（docs/findings.md §4）:
-#   同一企業 × 同一リリース種別内で, 地域情報がある本と無い本を比べると
-#   95.4% のセルで地域ありの方が届く媒体が広い（ユニーク媒体数の中央値差 +17.5）。
-#   拾っているのは「みんなの経済新聞ネットワーク」と地方紙。
-# video を最後にする根拠も実測: 動画有無の勝率は 49.1% で差が無い。
-# それ以外の順序は未測定のため, 顧客が答えやすい順（既に決まっていること → 当日の動き）で並べる。
+# 埋める順。place を先頭, video を末尾にする根拠は実測（docs/findings.md §4）。残りは答えやすい順
 SLOT_ORDER: Final[tuple[SlotCode, ...]] = ("place", "partner", "people", "novelty", "observation", "video")
 
 QUESTIONS: Final[dict[SlotCode, str]] = {
@@ -43,9 +36,7 @@ EFFECTS: Final[dict[SlotCode, str]] = {
 # 判定クエリC を通り, 因果を書いてよいスロット。通らなかったものは機能説明に留める（§6.5）
 CAUSAL_SLOTS: Final[frozenset[SlotCode]] = frozenset({"place"})
 
-# 読み取れなかったとき, 1回だけ聞き直すスロット。
-# place だけを対象にするのは実測の効果量が突出しているため（中央値 +17.5 媒体 / 95.4%）。
-# 「関東です」のような粒度不足で即あきらめると, 最大のレバーを1往復で捨てることになる。
+# 読み取れなかったとき1回だけ聞き直す。place だけなのは効果量が突出しているため（同 §4）
 RETRY_SLOTS: Final[frozenset[SlotCode]] = frozenset({"place"})
 
 FOLLOW_UPS: Final[dict[SlotCode, str]] = {
