@@ -6,8 +6,9 @@ services:
       context: ./backend
     container_name: prtimes-hackathon-backend
     environment:
-      # 本番でタスク定義が渡すものと同じ2つ。Parameter Store から注入される
+      # 本番でタスク定義が渡すものと同じ。Parameter Store から注入される
       OPENAI_API_KEY: ${OPENAI_API_KEY:?.env に OPENAI_API_KEY が無い}
+      DATABASE_URL: ${DATABASE_URL:?.env に DATABASE_URL が無い}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?.env に ALLOWED_ORIGINS が無い}
       # glibc malloc arena 数を制限して RSS 単調増加を抑える
       MALLOC_ARENA_MAX: "2"
