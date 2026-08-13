@@ -1,0 +1,1 @@
+{"description":"連携しているかどうか。","properties":{"configured":{"description":"この環境で連携機能が使えるか。false なら連携ボタンを出さない","title":"Configured","type":"boolean"},"connected":{"description":"Google と連携済みか","title":"Connected","type":"boolean"}},"required":["configured","connected"],"title":"CalendarStatus","type":"object","x-readme-ref-name":"CalendarStatus"}

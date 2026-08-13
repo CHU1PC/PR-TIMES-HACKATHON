@@ -1,0 +1,1 @@
+{"description":"予定を引く期間。キーは Google Calendar API の名前に合わせる。","properties":{"timeMax":{"anyOf":[{"type":"string"},{"type":"null"}],"description":"取得終了時刻 (RFC3339)","title":"Timemax"},"timeMin":{"anyOf":[{"type":"string"},{"type":"null"}],"description":"取得開始時刻 (RFC3339)","title":"Timemin"}},"title":"EventQuery","type":"object","x-readme-ref-name":"EventQuery"}
