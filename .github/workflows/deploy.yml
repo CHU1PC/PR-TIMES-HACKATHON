@@ -183,6 +183,10 @@ jobs:
             --network-configuration \
               "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$TASK_SG],assignPublicIp=ENABLED}" \
             --query 'tasks[0].taskArn' --output text)
+          if [ -z "$task" ] || [ "$task" = "None" ]; then
+            echo "::error::マイグレーションタスクを起動できなかった（配置失敗）"
+            exit 1
+          fi
           aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task"
 
           aws logs tail "$LOG_GROUP" --since 15m \
