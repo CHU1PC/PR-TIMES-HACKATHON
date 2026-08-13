@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Icon } from "@/components/Icon";
+import { formatDate, isValidDate } from "@/lib/date";
 import { loadHearing, loadSparring } from "@/lib/session";
-import { Link, navigate } from "@/router";
+import { Link, navigate, useQueryParam } from "@/router";
 
 const steps = [
   {
@@ -24,26 +25,47 @@ const steps = [
   },
 ];
 
+function sparringPath(title: string, startDate: string | null): string {
+  const params = new URLSearchParams({ title });
+  if (startDate) params.set("date", startDate);
+  return `/sparring?${params.toString()}`;
+}
+
 export function EntryPage() {
-  const [title, setTitle] = useState("");
+  const dateParam = useQueryParam("date");
+  const titleParam = useQueryParam("title");
+  const selectedDate = isValidDate(dateParam) ? dateParam : null;
+  const [title, setTitle] = useState(() => titleParam?.trim() ?? "");
   const [saved] = useState(() => ({ sparring: loadSparring(), hearing: loadHearing() }));
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
-    navigate(`/sparring?title=${encodeURIComponent(trimmed)}`);
+    navigate(sparringPath(trimmed, selectedDate));
   };
 
+  const hearingPath = selectedDate ? `/hearing?date=${encodeURIComponent(selectedDate)}` : "/hearing";
+
   return (
-    <section className="page home-page">
-      <header className="home-hero">
+    <section className="page home-page creation-page">
+      <header className="home-hero creation-hero">
+        <Link to="/" className="creation-hero__back">
+          <Icon name="arrow-left" size={16} />
+          ホームに戻る
+        </Link>
         <p className="home-hero__eyebrow">
           <Icon name="sparkles" size={17} />
           PRアイデアを形にする
         </p>
-        <h1 className="home-hero__title">ホーム</h1>
+        <h1 className="home-hero__title">{selectedDate ? `${formatDate(selectedDate)}のPRネタを作る` : "新しいPRネタを作る"}</h1>
         <p className="home-hero__lead">これからの予定を、届きやすいPRネタへ。AIと一緒に内容を整理しましょう。</p>
+        {selectedDate ? (
+          <p className="creation-hero__date">
+            <Icon name="calendar" size={16} />
+            選択日：{formatDate(selectedDate)}
+          </p>
+        ) : null}
       </header>
 
       <div className="home-actions">
@@ -86,7 +108,7 @@ export function EntryPage() {
           <p className="idea-search__kicker">NO IDEA YET?</p>
           <h2 className="idea-search__title">予定がまだ決まっていなくても大丈夫</h2>
           <p className="idea-search__description">すでに取り組んでいることから、PRにできそうな予定をAIと探せます。</p>
-          <Link to="/hearing" className="idea-search__link">
+          <Link to={hearingPath} className="idea-search__link">
             予定を一緒に探す
             <Icon name="arrow-right" size={17} />
           </Link>
@@ -128,7 +150,7 @@ export function EntryPage() {
           <ul className="resume__list">
             {saved.sparring ? (
               <li>
-                <Link to={`/sparring?title=${encodeURIComponent(saved.sparring.title)}`} className="resume__item">
+                <Link to={sparringPath(saved.sparring.title, saved.sparring.draft.start_date)} className="resume__item">
                   <span className="resume__item-icon">
                     <Icon name="message" size={19} />
                   </span>
@@ -142,7 +164,7 @@ export function EntryPage() {
             ) : null}
             {saved.hearing ? (
               <li>
-                <Link to="/hearing" className="resume__item">
+                <Link to={hearingPath} className="resume__item">
                   <span className="resume__item-icon">
                     <Icon name="search" size={19} />
                   </span>
