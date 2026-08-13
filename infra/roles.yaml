@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECS タスクが引く2つのロール. app スタックから分けてあるのは, CI と手元のユーザーから
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: prtimes-hackathon-2026summer
+
+  OpenAiParameterName:
+    Type: String
+    Default: /prtimes-hackathon/openai-api-key
+
+  DatabaseUrlParameterName:
+    Type: String
+    Default: /prtimes-hackathon/database-url
+
+Resources:
+  # イメージの取得とキーの注入を行う。アプリのコードはこのロールを使わない
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${NamePrefix}-exec"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-secrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # 名指しした2本だけ。プレフィックス一括にすると, 後で足した別用途の値まで読めてしまう
+              - Effect: Allow
+                Action: ssm:GetParameters
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
+
+              # AWS 管理鍵なら鍵ポリシー側で許可されるはずだが, 外れるとタスクが起動できない
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
+
+  # アプリが引くロール。外に出るのは OpenAI と DB だけで AWS API は叩かないので中身は空
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${NamePrefix}-task"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+Outputs:
+  ExecutionRoleArn:
+    Value: !GetAtt ExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ExecutionRoleArn"
+
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-TaskRoleArn"
