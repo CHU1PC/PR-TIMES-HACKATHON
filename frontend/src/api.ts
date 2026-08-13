@@ -1,5 +1,12 @@
-import { isHearingResponse, isSparringResponse } from "@/lib/guards";
-import type { HearingResponse, HearingTurn, SparringResponse, SparringTurn } from "@/types";
+import { isHearingResponse, isProposalResponse, isSparringResponse } from "@/lib/guards";
+import type {
+  HearingResponse,
+  HearingTurn,
+  ProposalRequest,
+  ProposalResponse,
+  SparringResponse,
+  SparringTurn,
+} from "@/types";
 
 const rawBase: string = import.meta.env.VITE_API_BASE ?? "";
 
@@ -8,6 +15,9 @@ const API_BASE = rawBase.replace(/\/+$/, "");
 
 // 壁打ちもヒアリングも毎ターン LLM を呼ぶので長めに取る
 const TIMEOUT_MS = 30_000;
+
+// 提案は 業種分類 + 埋め込み + 事例8件(各1000字)を読ませる生成 の3段なので, さらに長い
+const PROPOSAL_TIMEOUT_MS = 60_000;
 
 const MESSAGES = {
   timeout: "時間がかかっています。もう一度お試しください。",
@@ -40,9 +50,10 @@ async function post<T>(
   body: unknown,
   guard: (value: unknown) => value is T,
   signal?: AbortSignal,
+  timeoutMs: number = TIMEOUT_MS,
 ): Promise<ApiResult<T>> {
   // 呼び出し側の中断とタイムアウトの両方で切る
-  const timeout = AbortSignal.timeout(TIMEOUT_MS);
+  const timeout = AbortSignal.timeout(timeoutMs);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -66,4 +77,8 @@ export function sparringStep(turn: SparringTurn, signal?: AbortSignal): Promise<
 
 export function hearingStep(turn: HearingTurn, signal?: AbortSignal): Promise<ApiResult<HearingResponse>> {
   return post<HearingResponse>("/api/hearing/step", turn, isHearingResponse, signal);
+}
+
+export function fetchProposal(request: ProposalRequest, signal?: AbortSignal): Promise<ApiResult<ProposalResponse>> {
+  return post<ProposalResponse>("/api/proposal", request, isProposalResponse, signal, PROPOSAL_TIMEOUT_MS);
 }

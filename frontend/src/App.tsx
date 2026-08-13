@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { EntryPage } from "@/pages/EntryPage";
 import { HearingPage } from "@/pages/HearingPage";
+import { ProposalPage } from "@/pages/ProposalPage";
 import { SparringPage } from "@/pages/SparringPage";
 import { Link, useRouteLocation } from "@/router";
 
@@ -25,6 +26,7 @@ export default function App() {
   if (path === "/" || path === "") page = <EntryPage />;
   else if (path === "/sparring") page = <SparringPage />;
   else if (path === "/hearing") page = <HearingPage />;
+  else if (path === "/proposal") page = <ProposalPage />;
 
   return (
     <div className="app">
