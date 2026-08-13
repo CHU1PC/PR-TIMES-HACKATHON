@@ -120,6 +120,12 @@ jobs:
           verify=$(aws ssm get-parameter --name /prtimes-hackathon/origin-verify \
             --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$verify"
+          # 値を置くまでは連携を無効にしておく。true のまま値が無いとタスクが起動できない
+          if aws ssm get-parameter --name /prtimes-hackathon/google-client-id >/dev/null 2>&1; then
+            echo "calendar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "calendar=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "prefix_list=$pl" >> "$GITHUB_OUTPUT"
           echo "igw=$igw" >> "$GITHUB_OUTPUT"
           echo "db_sg=$dbsg" >> "$GITHUB_OUTPUT"
@@ -151,6 +157,7 @@ jobs:
               TaskRoleArn='${{ steps.net.outputs.task_role }}' \
               WebAclArn='${{ steps.net.outputs.web_acl }}' \
               OriginVerifySecret='${{ steps.net.outputs.verify }}' \
+              GoogleCalendarEnabled='${{ steps.net.outputs.calendar }}' \
               ImageUri='${{ steps.image.outputs.uri }}'
 
       - name: スタックの出力を読む
