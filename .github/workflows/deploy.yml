@@ -3,8 +3,8 @@ name: deploy
 # バックエンドを ECR へ積み、CloudFormation で AWS の構成を更新し、フロントを S3 へ配る。
 # main への push（docs と md を除く）と手動実行で発火。
 # AWS の認証は OIDC で、長期キーは持たない。ロールを引けるのは deploy ジョブだけ。
-# db スタックはここでは流さない。スキーマとコーパスの更新は手元から行う。
-# 公開先: CloudFront のドメイン（実行サマリに出る）
+# スキーマは ECS の使い捨てタスクが alembic で合わせる。RDS は VPC の外から届かない。
+# db スタックとコーパスの投入はここでは流さない。手元から行う。
 
 on:
   push:
@@ -14,7 +14,6 @@ on:
       - "**.md"
   workflow_dispatch:
 
-# 待ち行列はブランチではなくデプロイ先で決める。env は concurrency で使えないのでリテラル
 concurrency:
   group: deploy-prtimes-hackathon-app
   cancel-in-progress: false
@@ -32,7 +31,6 @@ env:
   APP_STACK: prtimes-hackathon-app
 
 jobs:
-  # 第三者のコードが走るので id-token を与えない
   check:
     runs-on: ubuntu-latest
     steps:
@@ -148,16 +146,6 @@ jobs:
               OriginVerifySecret='${{ steps.net.outputs.verify }}' \
               ImageUri='${{ steps.image.outputs.uri }}'
 
-      # 同じコミットを流し直すと change set が空になり, 新しいイメージでも入れ替わらない
-      - name: サービスを必ず入れ替える
-        run: |
-          aws ecs update-service --force-new-deployment \
-            --cluster "$(aws cloudformation describe-stacks --stack-name "$APP_STACK" \
-              --query 'Stacks[0].Outputs[?OutputKey==`ClusterName`].OutputValue' --output text)" \
-            --service "$(aws cloudformation describe-stacks --stack-name "$APP_STACK" \
-              --query 'Stacks[0].Outputs[?OutputKey==`ServiceName`].OutputValue' --output text)" \
-            >/dev/null
-
       - name: スタックの出力を読む
         id: stack
         # 既定のシェルは bash -e で pipefail が付かない。明示するとパイプ左側の失敗も拾う
@@ -167,11 +155,54 @@ jobs:
             --query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' --output text \
             | while read -r key value; do
                 case "$key" in
-                  AppUrl)             echo "app_url=$value" ;;
-                  FrontendBucketName) echo "bucket=$value" ;;
-                  DistributionId)     echo "distribution=$value" ;;
+                  AppUrl)                    echo "app_url=$value" ;;
+                  FrontendBucketName)        echo "bucket=$value" ;;
+                  DistributionId)            echo "distribution=$value" ;;
+                  ClusterName)               echo "cluster=$value" ;;
+                  ServiceName)               echo "service=$value" ;;
+                  MigrationTaskDefinitionArn) echo "migrate_task=$value" ;;
+                  TaskSubnetIds)             echo "subnets=$value" ;;
+                  TaskSecurityGroupId)       echo "task_sg=$value" ;;
+                  LogGroupName)              echo "log_group=$value" ;;
                 esac
               done >> "$GITHUB_OUTPUT"
+
+      # 新しいコードを配る前にスキーマを合わせる。追加のみに保ち, 旧コードを壊さないこと
+      - name: マイグレーションを流す
+        env:
+          CLUSTER: ${{ steps.stack.outputs.cluster }}
+          TASK_DEF: ${{ steps.stack.outputs.migrate_task }}
+          SUBNETS: ${{ steps.stack.outputs.subnets }}
+          TASK_SG: ${{ steps.stack.outputs.task_sg }}
+          LOG_GROUP: ${{ steps.stack.outputs.log_group }}
+        run: |
+          task=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration \
+              "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$TASK_SG],assignPublicIp=ENABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task"
+
+          aws logs tail "$LOG_GROUP" --since 15m \
+            --log-stream-name-prefix "migrate/migrate/${task##*/}" || true
+
+          code=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$code" != "0" ]; then
+            echo "::error::alembic upgrade head が終了コード $code で落ちた。サービスは入れ替えない"
+            exit 1
+          fi
+
+      # 同じコミットを流し直すと change set が空になり, 新しいイメージでも入れ替わらない
+      - name: サービスを必ず入れ替える
+        env:
+          CLUSTER: ${{ steps.stack.outputs.cluster }}
+          SERVICE: ${{ steps.stack.outputs.service }}
+        run: |
+          aws ecs update-service --force-new-deployment \
+            --cluster "$CLUSTER" --service "$SERVICE" >/dev/null
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
