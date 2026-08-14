@@ -16,6 +16,7 @@ import type {
   proposalRequestSchema,
   proposalResponseSchema,
   slotStateSchema,
+  sparringFormSchema,
   sparringResponseSchema,
   sparringTurnSchema,
   suggestionSchema,
@@ -37,6 +38,9 @@ export type Presence = NonNullable<PlanDraft["people"]>;
 export type YesNo = NonNullable<PlanDraft["video"]>;
 
 export type SparringTurn = z.infer<typeof sparringTurnSchema>;
+
+/** 6項目を一度に送るフォーム。空欄の項目は入れない */
+export type SparringForm = z.infer<typeof sparringFormSchema>;
 
 export type SparringResponse = z.infer<typeof sparringResponseSchema>;
 

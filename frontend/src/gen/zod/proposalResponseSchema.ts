@@ -12,7 +12,7 @@ import { z } from "zod/v4";
  */
 export const proposalResponseSchema = z.object({
     get "cases"(){
-                return z.array(proposalCaseSchema.describe("コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。")).describe("根拠にした事例")
+                return z.array(proposalCaseSchema.describe("コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。\n\n出すのは取り組みのやり方だけなので, 他社を名指しできる情報は exclude=True で JSON に載せない。\nタイトルと本文は社名を含むことが多く, LLM には渡すが応答には出さない。")).describe("根拠にした事例")
               },
 "media": z.array(z.string()).describe("事例群を拾っていた媒体のうち特徴的なもの。件数は付けない(requirements §7)"),
 get "suggestions"(){

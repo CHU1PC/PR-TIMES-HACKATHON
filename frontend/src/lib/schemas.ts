@@ -14,6 +14,7 @@ import {
   proposalRequestSchema,
   proposalResponseSchema as generatedProposalResponseSchema,
   slotStateSchema,
+  sparringFormSchema,
   sparringResponseSchema as generatedSparringResponseSchema,
   sparringTurnSchema,
   suggestionSchema,
@@ -33,6 +34,7 @@ export {
   proposalCaseSchema,
   proposalRequestSchema,
   slotStateSchema,
+  sparringFormSchema,
   sparringTurnSchema,
   suggestionSchema,
 };

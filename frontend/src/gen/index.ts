@@ -23,7 +23,10 @@ export type { ProposalApiProposalPost200, ProposalApiProposalPost422, ProposalAp
 export type { ProposalCase } from "./types/ProposalCase.ts";
 export type { ProposalRequest } from "./types/ProposalRequest.ts";
 export type { ProposalResponse } from "./types/ProposalResponse.ts";
+export type { PutDraftApiCalendarPlansEventIdDraftPut200, PutDraftApiCalendarPlansEventIdDraftPut422, PutDraftApiCalendarPlansEventIdDraftPutMutation, PutDraftApiCalendarPlansEventIdDraftPutMutationRequest, PutDraftApiCalendarPlansEventIdDraftPutMutationResponse, PutDraftApiCalendarPlansEventIdDraftPutPathParams } from "./types/PutDraftApiCalendarPlansEventIdDraftPut.ts";
 export type { SlotState, SlotStateCodeEnumKey, SlotStateToneEnumKey } from "./types/SlotState.ts";
+export type { SparringFillApiSparringFillPost200, SparringFillApiSparringFillPost422, SparringFillApiSparringFillPostMutation, SparringFillApiSparringFillPostMutationRequest, SparringFillApiSparringFillPostMutationResponse } from "./types/SparringFillApiSparringFillPost.ts";
+export type { SparringForm } from "./types/SparringForm.ts";
 export type { SparringResponse } from "./types/SparringResponse.ts";
 export type { SparringStepApiSparringStepPost200, SparringStepApiSparringStepPost422, SparringStepApiSparringStepPostMutation, SparringStepApiSparringStepPostMutationRequest, SparringStepApiSparringStepPostMutationResponse } from "./types/SparringStepApiSparringStepPost.ts";
 export type { SparringTurn } from "./types/SparringTurn.ts";
@@ -62,7 +65,10 @@ export { proposalApiProposalPost200Schema, proposalApiProposalPost422Schema, pro
 export { proposalCaseSchema } from "./zod/proposalCaseSchema.ts";
 export { proposalRequestSchema } from "./zod/proposalRequestSchema.ts";
 export { proposalResponseSchema } from "./zod/proposalResponseSchema.ts";
+export { putDraftApiCalendarPlansEventIdDraftPut200Schema, putDraftApiCalendarPlansEventIdDraftPut422Schema, putDraftApiCalendarPlansEventIdDraftPutMutationRequestSchema, putDraftApiCalendarPlansEventIdDraftPutMutationResponseSchema, putDraftApiCalendarPlansEventIdDraftPutPathParamsSchema } from "./zod/putDraftApiCalendarPlansEventIdDraftPutSchema.ts";
 export { slotStateSchema } from "./zod/slotStateSchema.ts";
+export { sparringFillApiSparringFillPost200Schema, sparringFillApiSparringFillPost422Schema, sparringFillApiSparringFillPostMutationRequestSchema, sparringFillApiSparringFillPostMutationResponseSchema } from "./zod/sparringFillApiSparringFillPostSchema.ts";
+export { sparringFormSchema } from "./zod/sparringFormSchema.ts";
 export { sparringResponseSchema } from "./zod/sparringResponseSchema.ts";
 export { sparringStepApiSparringStepPost200Schema, sparringStepApiSparringStepPost422Schema, sparringStepApiSparringStepPostMutationRequestSchema, sparringStepApiSparringStepPostMutationResponseSchema } from "./zod/sparringStepApiSparringStepPostSchema.ts";
 export { sparringTurnSchema } from "./zod/sparringTurnSchema.ts";

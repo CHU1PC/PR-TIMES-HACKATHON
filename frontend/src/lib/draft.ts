@@ -1,5 +1,8 @@
 import { formatDate } from "@/lib/date";
-import type { PlanDraft, Presence, SlotCode, YesNo } from "@/types";
+import type { CalendarEvent, PlanDraft, Presence, SlotCode, YesNo } from "@/types";
+
+/** サーバーが予定に載せてくる draft。既定値持ちのキーは省かれることがある */
+type SavedDraft = NonNullable<CalendarEvent["draft"]>;
 
 const SLOT_NAMES = {
   place: "場所",
@@ -35,6 +38,46 @@ export function newDraft(title: string, startDate: string | null = null): PlanDr
     skipped: [],
     retried: [],
   };
+}
+
+/** 予定に保存されていた内容を, 欠けの無い形に揃える。 */
+export function restoredDraft(saved: SavedDraft, title: string, startDate: string | null): PlanDraft {
+  return {
+    title: saved.title || title,
+    start_date: saved.start_date ?? startDate,
+    place: saved.place ?? null,
+    partner: saved.partner ?? [],
+    people: saved.people ?? null,
+    novelty: saved.novelty ?? null,
+    observation: saved.observation ?? null,
+    video: saved.video ?? null,
+    skipped: saved.skipped ?? [],
+    retried: saved.retried ?? [],
+  };
+}
+
+/** 決まっている値をフォームの初期値にする。未回答は空欄 */
+export function draftAnswers(draft: PlanDraft): Record<SlotCode, string> {
+  return {
+    place: draft.place ?? "",
+    partner: draft.partner.join("、"),
+    people: draft.people ? PEOPLE_TEXT[draft.people] : "",
+    novelty: draft.novelty ?? "",
+    observation: draft.observation ?? "",
+    video: draft.video ? VIDEO_TEXT[draft.video] : "",
+  };
+}
+
+/** 書き換えた項目を空に戻す。サーバーは値が入っている項目を上書きしない */
+export function clearSlots(draft: PlanDraft, codes: readonly SlotCode[]): PlanDraft {
+  const next: PlanDraft = { ...draft };
+  for (const code of codes) {
+    if (code === "partner") next.partner = [];
+    else if (code === "people") next.people = null;
+    else if (code === "video") next.video = null;
+    else next[code] = null;
+  }
+  return next;
 }
 
 export interface SummaryRow {

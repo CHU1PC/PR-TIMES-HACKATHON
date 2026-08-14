@@ -17,8 +17,10 @@ import type {
   EventCreate,
   HearingResponse,
   HearingTurn,
+  PlanDraft,
   ProposalRequest,
   ProposalResponse,
+  SparringForm,
   SparringResponse,
   SparringTurn,
 } from "@/types";
@@ -124,6 +126,11 @@ export function sparringStep(turn: SparringTurn, signal?: AbortSignal): Promise<
   return post<SparringResponse>("/api/sparring/step", turn, sparringResponseSchema, signal);
 }
 
+/** 6項目をまとめて反映する。粗くて読み取れなかった項目だけ question が返る */
+export function sparringFill(form: SparringForm, signal?: AbortSignal): Promise<ApiResult<SparringResponse>> {
+  return post<SparringResponse>("/api/sparring/fill", form, sparringResponseSchema, signal);
+}
+
 export function hearingStep(turn: HearingTurn, signal?: AbortSignal): Promise<ApiResult<HearingResponse>> {
   return post<HearingResponse>("/api/hearing/step", turn, hearingResponseSchema, signal);
 }
@@ -163,6 +170,17 @@ export function createPlan(plan: EventCreate, signal?: AbortSignal): Promise<Api
     body: JSON.stringify(plan),
   };
   return request("/api/calendar/plans", init, calendarEventSchema, signal);
+}
+
+/** 壁打ちで埋めた内容をその予定に残す。本人の予定に無ければ 404 */
+export function saveDraft(eventId: string, draft: PlanDraft, signal?: AbortSignal): Promise<ApiResult<CalendarEvent>> {
+  const init: RequestInit = {
+    ...WITH_SESSION,
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(draft),
+  };
+  return request(`/api/calendar/plans/${encodeURIComponent(eventId)}/draft`, init, calendarEventSchema, signal);
 }
 
 /** 名前だけでログインする。初めての名前ならサーバーがデモの予定を積む。204 なので本文は読まない */

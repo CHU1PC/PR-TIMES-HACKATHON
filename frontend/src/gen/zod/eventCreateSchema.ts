@@ -12,6 +12,7 @@ export const eventCreateSchema = z.object({
     "allDay": z.optional(z.boolean().default(false).describe("終日の予定か")),
 "description": z.optional(z.string().default("").describe("予定の詳細。無ければ空文字")),
 "endsAt": z.string().describe("終了 (RFC3339)"),
+"location": z.optional(z.string().max(255).default("").describe("場所。市区町村まで入ると地元紙が拾う")),
 "startsAt": z.string().describe("開始 (RFC3339)"),
 "title": z.string().min(1).max(255).describe("予定の件名")
     }).describe("画面から足す予定1件。時刻は RFC3339 で受ける。")

@@ -22,6 +22,14 @@ export function isValidDate(value: string | null | undefined): value is string {
   return typeof value === "string" && parseDate(value) !== null;
 }
 
+/** その日1日ぶんの取得範囲。地域時間の 0時から 23:59 まで。 */
+export function dayRange(day: string): { timeMin: string; timeMax: string } {
+  const [year, month, date] = day.split("-").map(Number);
+  const start = new Date(year ?? 0, (month ?? 1) - 1, date ?? 1, 0, 0, 0);
+  const end = new Date(year ?? 0, (month ?? 1) - 1, date ?? 1, 23, 59, 0);
+  return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+}
+
 /** "YYYY-MM-DD" を「2026年9月1日(火)」にする。読めない値はそのまま返す。 */
 export function formatDate(value: string): string {
   const parsed = parseDate(value);
