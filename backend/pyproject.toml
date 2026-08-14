@@ -31,6 +31,7 @@ dev = [
 ]
 etl = [
     "duckdb>=1.1",
+    "fugashi[unidic-lite]>=1.5.2",
     "psycopg[binary]>=3.2",
 ]
 test = [
@@ -38,6 +39,14 @@ test = [
     "fastapi[standard]>=0.115",
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
+]
+# ml/ の学習・評価専用。推論に要るのは lightgbm と numpy だけで, 残りはオフライン側
+ml = [
+    "lightgbm>=4.5",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "scikit-learn>=1.5",
+    "scipy>=1.14",
 ]
 
 [tool.fastapi]
@@ -91,6 +100,9 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "etl/**" = ["print", "hardcoded-sql-expression"]
 # hardcoded-sql-expression: 埋め込むのは加点幅のモジュール定数のみで, 外部入力を連結しない.
 "app/retrieval/**" = ["hardcoded-sql-expression"]
+# print: 学習・評価はオフラインのバッチで, 結果表を標準出力に出す前提のため logger を通さない.
+# suspicious-pickle-usage: joblib で保存するのは自分で学習した係数のみで, 外部の pickle を読まない.
+"ml/**" = ["print", "suspicious-pickle-usage"]
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
