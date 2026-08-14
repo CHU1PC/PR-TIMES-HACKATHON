@@ -92,6 +92,40 @@ cd backend && uv run alembic revision --autogenerate -m "add users and sessions"
 旧コードが数十秒だけ新しいスキーマの上で動く。追加だけに保てばここは無害だが、
 消す変更は「新コードが参照をやめる」→ デプロイ → 「列を消す」の2回に分ける。
 
+### corpus に列を足したら, 本番は手で入れ直す
+
+**CI は `alembic upgrade head` しか流さない。`etl.load_corpus` はどこでも走らない。**
+コーパスの中身は最初に踏み台越しで一度入れたきりなので、**列を足しても本番の値は既定値のまま**になる。
+
+気づきにくい壊れ方をする。`corpus.pv_score` が全件 0 だと採点が全部 0 になり、
+**エラーも出さずにランキングだけが「全部同じ順位」になる。**
+
+手順は3つ。手元で parquet を作り直し、踏み台越しにトンネルを張り、投入する。
+
+```bash
+cd backend
+uv run --group etl --env-file ../.env python -m etl.enrich merge   # 7秒
+
+ep=$(aws rds describe-db-instances --db-instance-identifier prtimes-hackathon-2026summer-app \
+  --query 'DBInstances[0].Endpoint.Address' --output text)
+ssh -i ~/.ssh/prtimes/hackathon.pem -N -f -L "15434:$ep:5432" ubuntu@13.112.91.188
+
+DATABASE_URL="postgresql://prtimes:${PW}@127.0.0.1:15434/app" \
+  uv run --group etl python -m etl.load_corpus                     # 34秒
+```
+
+`load_corpus` は `TRUNCATE ... RESTART IDENTITY` してから全件入れ直す。**`corpus_vec.npy` は
+作り直さなくてよい**(行順 `ORDER BY company_id, release_id` が保たれる限り再利用できる)。
+`users` / `events` など運用データのテーブルには触らない。
+
+入ったか確かめる。年をまたいで `pv_score` の中央値が 0.5 前後に揃っていれば正しい。
+
+```sql
+SELECT extract(year FROM published_on)::int AS y, count(*),
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY pv_score)::numeric, 3)
+FROM corpus GROUP BY 1 ORDER BY 1;
+```
+
 ### 本番のコピーに当てて確かめる
 
 順番を直したので migration の失敗で本番が壊れることはないが、**失敗すること自体は防げない。**
