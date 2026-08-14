@@ -308,6 +308,7 @@ Resources:
               - iam:GetRolePolicy
               - iam:ListRolePolicies
               - iam:ListAttachedRolePolicies
+              - iam:UpdateAssumeRolePolicy
             Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${NamePrefix}-*"
 
           - Sid: AttachOnlyKnownPolicies
