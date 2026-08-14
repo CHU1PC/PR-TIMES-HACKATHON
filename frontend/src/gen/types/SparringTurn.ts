@@ -17,6 +17,7 @@ export type SparringTurn = {
     draft: PlanDraft;
     /**
      * @description 直前の質問への顧客の返答。初回は空
+     * @maxLength 2000
      * @default ""
      * @type string | undefined
     */

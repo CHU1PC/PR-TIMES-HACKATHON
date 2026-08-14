@@ -11,11 +11,13 @@
 export type Exchange = {
     /**
      * @description 相手の返答
+     * @maxLength 2000
      * @type string
     */
     answer: string;
     /**
      * @description こちらが聞いたこと
+     * @maxLength 2000
      * @type string
     */
     question: string;

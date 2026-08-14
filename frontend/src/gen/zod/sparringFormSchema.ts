@@ -12,7 +12,7 @@ import { z } from "zod/v4";
 export const sparringFormSchema = z.object({
     "answers": z.optional(z.object({
     
-    }).catchall(z.string()).describe("スロットごとの自由記述。書かなかった項目は入れなくてよい")),
+    }).catchall(z.string().max(2000)).describe("スロットごとの自由記述。書かなかった項目は入れなくてよい")),
 get "draft"(){
                 return planDraftSchema.describe("壁打ちで育てている途中のイベント内容。")
               }

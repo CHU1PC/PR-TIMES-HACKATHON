@@ -7,9 +7,10 @@ import { HTTPValidationErrorSchema } from "./HTTPValidationErrorSchema.ts";
 import { z } from "zod/v4";
 
 export const oauthCallbackApiCalendarOauthCallbackGetQueryParamsSchema = z.object({
-    "code": z.string(),
-"state": z.string()
-    })
+    "code": z.optional(z.union([z.string(), z.null()])),
+"state": z.optional(z.union([z.string(), z.null()])),
+"error": z.optional(z.union([z.string(), z.null()]))
+    }).optional()
 
 /**
  * @description Successful Response

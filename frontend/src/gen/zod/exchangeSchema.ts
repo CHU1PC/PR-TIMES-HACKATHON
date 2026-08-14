@@ -9,6 +9,6 @@ import { z } from "zod/v4";
  * @description 聞き取りの1往復。
  */
 export const exchangeSchema = z.object({
-    "answer": z.string().describe("相手の返答"),
-"question": z.string().describe("こちらが聞いたこと")
+    "answer": z.string().max(2000).describe("相手の返答"),
+"question": z.string().max(2000).describe("こちらが聞いたこと")
     }).describe("聞き取りの1往復。")

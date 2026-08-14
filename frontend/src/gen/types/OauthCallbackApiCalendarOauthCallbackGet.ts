@@ -6,14 +6,9 @@
 import type { HTTPValidationError } from "./HTTPValidationError.ts";
 
 export type OauthCallbackApiCalendarOauthCallbackGetQueryParams = {
-    /**
-     * @type string
-    */
-    code: string;
-    /**
-     * @type string
-    */
-    state: string;
+    code?: (string | null);
+    state?: (string | null);
+    error?: (string | null);
 };
 
 /**
