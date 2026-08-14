@@ -1,9 +1,9 @@
 from typing import Final
 
-from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col
 
+from app.auth.identities import find_user
 from app.db.models import OAuthIdentity, User
 
 # oauth_identities の provider 列に入れる。google と同じ枠で1人を指す
@@ -40,27 +40,27 @@ async def register(db: AsyncSession, name: str | None) -> tuple[User, bool]:
 
     Returns:
         ユーザーと, 今作ったかどうか。作ったときだけ呼び出し側が初期データを積む。
+
+    Raises:
+        IntegrityError: 衝突後の引き直しでも行が見つからないとき。uq 以外の違反。
     """
     resolved = normalize_name(name)
 
-    found = (
-        await db.execute(
-            select(OAuthIdentity).where(
-                col(OAuthIdentity.provider) == DEMO_PROVIDER,
-                col(OAuthIdentity.subject) == resolved,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if found is not None:
-        existing = await db.get(User, found.user_id)
-        if existing is not None:
-            return existing, False
+    existing = await find_user(db, provider=DEMO_PROVIDER, subject=resolved)
+    if existing is not None:
+        return existing, False
 
     user = User(email=None, name=resolved)
     db.add(user)
-    await db.flush()
-    db.add(OAuthIdentity(user_id=user.id, provider=DEMO_PROVIDER, subject=resolved, email=None))
-    await db.commit()
-
+    try:
+        await db.flush()
+        db.add(OAuthIdentity(user_id=user.id, provider=DEMO_PROVIDER, subject=resolved, email=None))
+        await db.commit()
+    except IntegrityError:
+        # 同名の同時登録に負けた → 勝った人に戻る。初期データを積むのは勝った側だけ
+        await db.rollback()
+        winner = await find_user(db, provider=DEMO_PROVIDER, subject=resolved)
+        if winner is None:
+            raise
+        return winner, False
     return user, True

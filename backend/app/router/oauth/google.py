@@ -76,21 +76,35 @@ def start_oauth() -> RedirectResponse:
 
 
 @router.get("/oauth/callback")
-async def oauth_callback(request: Request, code: str, state: str, db: DbSessionDep) -> RedirectResponse:
+async def oauth_callback(
+    request: Request,
+    db: DbSessionDep,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+) -> RedirectResponse:
     """認可コードを交換し, ユーザーを作ってログインさせ, カレンダーのトークンを保存する。
 
     Args:
         request: state の Cookie とクライアント情報を読むために使う。
-        code: Google が返した認可コード。
-        state: Google が返した突き合わせ用の値。
         db: データベースセッション。
+        code: Google が返した認可コード。キャンセル時は来ない。
+        state: Google が返した突き合わせ用の値。キャンセル時は来ない。
+        error: Google が返した拒否理由。access_denied など。
 
     Returns:
-        フロントへのリダイレクト。セッション Cookie を載せる。
+        フロントへのリダイレクト。成功時はセッション Cookie を載せる。
 
     Raises:
         HTTPException: state が一致しないとき 400。交換や ID token の検証に失敗したとき 502。
     """
+    # キャンセルや拒否はトップレベル遷移で戻るので, JSON でなく画面へ返す
+    if error or code is None or state is None:
+        logger.info("Google の同意が得られず戻す error={}", error)
+        cancelled = RedirectResponse(settings.FRONTEND_URL)
+        cancelled.delete_cookie(STATE_COOKIE, httponly=True, secure=settings.COOKIE_SECURE, samesite="lax")
+        return cancelled
+
     cookie_state = request.cookies.get(STATE_COOKIE)
     if cookie_state is None or not secrets.compare_digest(cookie_state, state):
         raise HTTPException(
