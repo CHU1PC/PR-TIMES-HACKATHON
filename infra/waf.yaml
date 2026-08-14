@@ -8,7 +8,8 @@ Parameters:
 
   RequestsPer5Minutes:
     Type: Number
-    Default: 100
+    # 会場の Wi-Fi は NAT で全員が同じ IP。100 だと審査員が触るだけで全員まとめて弾かれる
+    Default: 1000
     MinValue: 10
     Description: >-
       1つの IP からこの数を超えたら遮断する.
