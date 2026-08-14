@@ -47,7 +47,7 @@ const MESSAGES = {
   network: "サーバーにつながりませんでした。もう一度お試しください。",
   server: "サーバーが応答しませんでした。もう一度お試しください。",
   malformed: "サーバーの応答を読み取れませんでした。",
-  unauthorized: "ログインの有効期限が切れました。",
+  unauthorized: "ログインが必要です。ホームの「デモで入る」から名前だけで始められます。",
   cancelled: "",
 } as const satisfies Record<ApiFailureKind, string>;
 
