@@ -300,11 +300,13 @@
         "properties": {
           "answer": {
             "description": "相手の返答",
+            "maxLength": 2000,
             "title": "Answer",
             "type": "string"
           },
           "question": {
             "description": "こちらが聞いたこと",
+            "maxLength": 2000,
             "title": "Question",
             "type": "string"
           }
@@ -394,6 +396,7 @@
           "answer": {
             "default": "",
             "description": "直前の質問への返答。初回は空",
+            "maxLength": 2000,
             "title": "Answer",
             "type": "string"
           },
@@ -402,6 +405,7 @@
             "items": {
               "$ref": "#/components/schemas/Exchange"
             },
+            "maxItems": 30,
             "title": "History",
             "type": "array"
           }
@@ -729,6 +733,7 @@
         "properties": {
           "answers": {
             "additionalProperties": {
+              "maxLength": 2000,
               "type": "string"
             },
             "description": "スロットごとの自由記述。書かなかった項目は入れなくてよい",
@@ -821,6 +826,7 @@
           "reply": {
             "default": "",
             "description": "直前の質問への顧客の返答。初回は空",
+            "maxLength": 2000,
             "title": "Reply",
             "type": "string"
           }
@@ -1038,25 +1044,55 @@
     },
     "/api/calendar/oauth/callback": {
       "get": {
-        "description": "認可コードを交換し, ユーザーを作ってログインさせ, カレンダーのトークンを保存する。\n\nArgs:\n    request: state の Cookie とクライアント情報を読むために使う。\n    code: Google が返した認可コード。\n    state: Google が返した突き合わせ用の値。\n    db: データベースセッション。\n\nReturns:\n    フロントへのリダイレクト。セッション Cookie を載せる。\n\nRaises:\n    HTTPException: state が一致しないとき 400。交換や ID token の検証に失敗したとき 502。",
+        "description": "認可コードを交換し, ユーザーを作ってログインさせ, カレンダーのトークンを保存する。\n\nArgs:\n    request: state の Cookie とクライアント情報を読むために使う。\n    db: データベースセッション。\n    code: Google が返した認可コード。キャンセル時は来ない。\n    state: Google が返した突き合わせ用の値。キャンセル時は来ない。\n    error: Google が返した拒否理由。access_denied など。\n\nReturns:\n    フロントへのリダイレクト。成功時はセッション Cookie を載せる。\n\nRaises:\n    HTTPException: state が一致しないとき 400。交換や ID token の検証に失敗したとき 502。",
         "operationId": "oauth_callback_api_calendar_oauth_callback_get",
         "parameters": [
           {
             "in": "query",
             "name": "code",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Code",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
             }
           },
           {
             "in": "query",
             "name": "state",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "State",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
             }
           }
         ],

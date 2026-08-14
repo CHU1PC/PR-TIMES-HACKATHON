@@ -13,5 +13,5 @@ export const sparringTurnSchema = z.object({
     get "draft"(){
                 return planDraftSchema.describe("壁打ちで育てている途中のイベント内容。")
               },
-"reply": z.optional(z.string().default("").describe("直前の質問への顧客の返答。初回は空"))
+"reply": z.optional(z.string().max(2000).default("").describe("直前の質問への顧客の返答。初回は空"))
     }).describe("1往復ぶんの入力。")

@@ -12,6 +12,7 @@ import type { Exchange } from "./Exchange.ts";
 export type HearingTurn = {
     /**
      * @description 直前の質問への返答。初回は空
+     * @maxLength 2000
      * @default ""
      * @type string | undefined
     */

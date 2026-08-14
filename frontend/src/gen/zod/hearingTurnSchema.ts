@@ -10,8 +10,8 @@ import { z } from "zod/v4";
  * @description 1往復ぶんの入力。
  */
 export const hearingTurnSchema = z.object({
-    "answer": z.optional(z.string().default("").describe("直前の質問への返答。初回は空")),
+    "answer": z.optional(z.string().max(2000).default("").describe("直前の質問への返答。初回は空")),
 get "history"(){
-                return z.array(exchangeSchema.describe("聞き取りの1往復。")).describe("ここまでの往復。初回は空").optional()
+                return z.array(exchangeSchema.describe("聞き取りの1往復。")).max(30).describe("ここまでの往復。初回は空").optional()
               }
     }).describe("1往復ぶんの入力。")
