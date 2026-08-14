@@ -1,8 +1,13 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 SlotCode = Literal["place", "partner", "people", "novelty", "observation", "video"]
+
+# 顧客の自由記述はここまで。上限が無いとプロンプトへ無制限に増幅される
+REPLY_MAX = 2000
+
+Reply = Annotated[str, StringConstraints(max_length=REPLY_MAX)]
 
 
 class PlanDraft(BaseModel):
@@ -31,15 +36,15 @@ class SparringTurn(BaseModel):
     """1往復ぶんの入力。"""
 
     draft: PlanDraft = Field(description="いま分かっているイベント内容")
-    reply: str = Field(default="", description="直前の質問への顧客の返答。初回は空")
+    reply: Reply = Field(default="", description="直前の質問への顧客の返答。初回は空")
 
 
 class SparringForm(BaseModel):
     """フォームで一度に受け取る答え。空欄の項目は該当なしとして扱う。"""
 
     draft: PlanDraft = Field(description="いま分かっているイベント内容")
-    answers: dict[SlotCode, str] = Field(
-        default_factory=dict[SlotCode, str],
+    answers: dict[SlotCode, Reply] = Field(
+        default_factory=dict[SlotCode, Reply],
         description="スロットごとの自由記述。書かなかった項目は入れなくてよい",
     )
 
