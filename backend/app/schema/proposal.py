@@ -4,14 +4,18 @@ from app.schema.sparring import PlanDraft
 
 
 class ProposalCase(BaseModel):
-    """コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。"""
+    """コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。
 
-    company_id: int = Field(description="PR TIMES 側の企業ID")
-    release_id: int = Field(description="企業内でのリリースID")
-    title: str = Field(description="リリースのタイトル")
-    subtitle: str = Field(default="", description="サブタイトル。lead_paragraph の代替(2026年の充填率74%)")
-    body_head: str = Field(default="", description="本文冒頭をHTML除去して1000文字。全文は定型文が大半で取らない")
-    company_name: str | None = Field(default=None, description="配信企業名")
+    出すのは取り組みのやり方だけなので, 他社を名指しできる情報は exclude=True で JSON に載せない。
+    タイトルと本文は社名を含むことが多く, LLM には渡すが応答には出さない。
+    """
+
+    company_id: int = Field(exclude=True, description="PR TIMES 側の企業ID")
+    release_id: int = Field(exclude=True, description="企業内でのリリースID")
+    title: str = Field(exclude=True, description="リリースのタイトル")
+    subtitle: str = Field(default="", exclude=True, description="サブタイトル。lead_paragraph の代替")
+    body_head: str = Field(default="", exclude=True, description="本文冒頭をHTML除去して1000文字")
+    company_name: str | None = Field(default=None, exclude=True, description="配信企業名")
     business_category: str | None = Field(default=None, description="業種名")
     release_type: str | None = Field(default=None, description="リリース種別名")
     prefecture: str | None = Field(default=None, description="都道府県名")
