@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "generate:openapi": "sh scripts/export-openapi.sh",
+    "generate:openapi": "cd ../backend && PYTHONPATH=. OPENAI_API_KEY=${OPENAI_API_KEY:-dummy} uv run scripts/dump_openapi.py",
     "generate:api": "bun run generate:openapi && kubb generate"
   },
   "dependencies": {
