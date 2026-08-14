@@ -1,0 +1,152 @@
+{
+  "splits": {
+    "random": {
+      "knn_baseline": {
+        "spearman": 0.3585877818652707,
+        "ndcg@10_random20": 0.7735894150715368,
+        "ndcg@10_company": 0.7581716333651854,
+        "company_groups": 479.0,
+        "rmse": 0.274748553466806
+      },
+      "lgbm": {
+        "spearman": 0.42178729207342264,
+        "ndcg@10_random20": 0.7950429120588549,
+        "ndcg@10_company": 0.7740669122524075,
+        "company_groups": 479.0,
+        "rmse": 0.2589376986757804,
+        "gap_vs_baseline_low": 0.05369313942350573,
+        "gap_vs_baseline_high": 0.07267655311411267
+      },
+      "forest": {
+        "spearman": 0.3795579279417131,
+        "ndcg@10_random20": 0.778886751379682,
+        "ndcg@10_company": 0.7646553052798779,
+        "company_groups": 479.0,
+        "rmse": 0.2671180014189317,
+        "gap_vs_baseline_low": 0.011030926093992609,
+        "gap_vs_baseline_high": 0.03136656550510119
+      },
+      "ridge": {
+        "spearman": 0.4053915898481812,
+        "ndcg@10_random20": 0.786337321595769,
+        "ndcg@10_company": 0.7687337113025322,
+        "company_groups": 479.0,
+        "rmse": 0.26157035082298086
+      },
+      "mlp": {
+        "spearman": 0.3999781851680954,
+        "ndcg@10_random20": 0.7870111275484606,
+        "ndcg@10_company": 0.7720336143207912,
+        "company_groups": 479.0,
+        "rmse": 0.26205554983383267
+      },
+      "lgbm+mlp": {
+        "spearman": 0.4220614197792554,
+        "ndcg@10_random20": 0.7948429138148222,
+        "ndcg@10_company": 0.7739645192934794,
+        "company_groups": 479.0,
+        "rmse": 0.30477899963836685
+      }
+    },
+    "temporal": {
+      "knn_baseline": {
+        "spearman": 0.33903985928469077,
+        "ndcg@10_random20": 0.7562490976030254,
+        "ndcg@10_company": 0.6944958263763096,
+        "company_groups": 25.0,
+        "rmse": 0.27752383922434554
+      },
+      "lgbm": {
+        "spearman": 0.3588133609503944,
+        "ndcg@10_random20": 0.7622640739374458,
+        "ndcg@10_company": 0.6995753695261514,
+        "company_groups": 25.0,
+        "rmse": 0.27055509530629435,
+        "gap_vs_baseline_low": -0.0005799946018445869,
+        "gap_vs_baseline_high": 0.03865398840669252
+      },
+      "forest": {
+        "spearman": 0.3240988517489585,
+        "ndcg@10_random20": 0.7517430738154205,
+        "ndcg@10_company": 0.6884771200819441,
+        "company_groups": 25.0,
+        "rmse": 0.2715977999664726,
+        "gap_vs_baseline_low": -0.038765959012216675,
+        "gap_vs_baseline_high": 0.006844823039240193
+      },
+      "ridge": {
+        "spearman": 0.35337221589791246,
+        "ndcg@10_random20": 0.7569180355927682,
+        "ndcg@10_company": 0.7210818244556383,
+        "company_groups": 25.0,
+        "rmse": 0.2723134378261217
+      },
+      "mlp": {
+        "spearman": 0.3364544128468651,
+        "ndcg@10_random20": 0.7524031718790725,
+        "ndcg@10_company": 0.6957326783062929,
+        "company_groups": 25.0,
+        "rmse": 0.2761163670189135
+      },
+      "lgbm+mlp": {
+        "spearman": 0.35644304364181656,
+        "ndcg@10_random20": 0.7617721615757314,
+        "ndcg@10_company": 0.7031593769043724,
+        "company_groups": 25.0,
+        "rmse": 0.3216763441528057
+      }
+    }
+  },
+  "acceptance": [
+    {
+      "plan": "熊本市中央区に新店舗をオープンします",
+      "knn_baseline": 0.8231866189892311,
+      "lgbm": 0.7711720732166758,
+      "knn_rank": 1,
+      "lgbm_rank": 1
+    },
+    {
+      "plan": "創業50周年を迎えます",
+      "knn_baseline": 0.6409773129435056,
+      "lgbm": 0.6071026917639902,
+      "knn_rank": 2,
+      "lgbm_rank": 2
+    },
+    {
+      "plan": "新年のご挨拶",
+      "knn_baseline": 0.46259882772322064,
+      "lgbm": 0.38173588018921617,
+      "knn_rank": 3,
+      "lgbm_rank": 6
+    },
+    {
+      "plan": "定例の社内会議",
+      "knn_baseline": 0.37829966441192875,
+      "lgbm": 0.4183856794458866,
+      "knn_rank": 4,
+      "lgbm_rank": 5
+    },
+    {
+      "plan": "地元の高校生と共同開発したお菓子の販売会",
+      "knn_baseline": 0.36764278530263145,
+      "lgbm": 0.5039072362031486,
+      "knn_rank": 5,
+      "lgbm_rank": 3
+    },
+    {
+      "plan": "年頭所感を発表します",
+      "knn_baseline": 0.34623471212704404,
+      "lgbm": 0.4917885131747113,
+      "knn_rank": 6,
+      "lgbm_rank": 4
+    }
+  ],
+  "artifact_mb": {
+    "encoder.joblib": 7.05718994140625e-05,
+    "forest.joblib": 77.27383518218994,
+    "lgbm.txt": 5.159981727600098,
+    "meta.json": 0.0005254745483398438,
+    "mlp.joblib": 2.7235984802246094,
+    "ridge.joblib": 0.0020418167114257812
+  }
+}
