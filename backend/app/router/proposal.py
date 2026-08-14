@@ -1,9 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.dependencies import get_current_user
 from app.proposal import propose
 from app.schema.proposal import ProposalRequest, ProposalResponse
 
-router = APIRouter(prefix="/api/proposal", tags=["proposal"])
+# OpenAI を呼ぶのでログイン必須。デモログインでも通る
+router = APIRouter(prefix="/api/proposal", tags=["proposal"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("")

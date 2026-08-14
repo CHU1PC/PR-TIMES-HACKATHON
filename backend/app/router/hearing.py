@@ -1,9 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.dependencies import get_current_user
 from app.hearing import step
 from app.schema import HearingResponse, HearingTurn
 
-router = APIRouter(prefix="/api/hearing", tags=["hearing"])
+# OpenAI を呼ぶのでログイン必須。デモログインでも通る
+router = APIRouter(prefix="/api/hearing", tags=["hearing"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/step")

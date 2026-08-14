@@ -1,9 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.dependencies import get_current_user
 from app.schema import SparringForm, SparringResponse, SparringTurn
 from app.sparring import fill_all, step
 
-router = APIRouter(prefix="/api/sparring", tags=["sparring"])
+# OpenAI を呼ぶのでログイン必須。デモログインでも通る
+router = APIRouter(prefix="/api/sparring", tags=["sparring"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/step")
