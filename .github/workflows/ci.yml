@@ -1,0 +1,60 @@
+name: ci
+
+# lint と型検査。develop 宛ての PR と develop への push で発火する。
+# deploy.yml からも呼ぶので検査の中身はここ1箇所だけ。複製すると片方だけ古くなる。
+# main への push は deploy.yml がこれを呼ぶので, ここでは発火させない。
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  push:
+    branches: [develop]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  workflow_call:
+
+# 同じ PR に続けて push したら前の実行は捨てる。develop への push は打ち切らない
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+
+      # alembic/versions も対象。自動生成の生出力が混ざると main で初めて落ちる
+      - name: バックエンドの lint とテスト
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest -q
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: フロントの型検査
+        working-directory: frontend
+        run: |
+          bun install --frozen-lockfile
+          bunx tsc --noEmit
+
+      # 生成物はコミットされているので, 再生成を忘れると型だけ古いまま通る。
+      # 実行時に zod が落ちて画面が黙って空になるため, ここで差分を止める
+      - name: openapi と生成物が最新か
+        working-directory: frontend
+        run: |
+          bun run generate:api
+          git diff --exit-code -- openapi.json src/gen
