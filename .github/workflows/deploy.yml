@@ -1,0 +1,230 @@
+name: deploy
+
+# バックエンドを ECR へ積み、CloudFormation で AWS の構成を更新し、フロントを S3 へ配る。
+# main への push(docs と md を除く)と手動実行で発火。
+# AWS の認証は OIDC で、長期キーは持たない。ロールを引けるのは deploy ジョブだけ。
+# スキーマは ECS の使い捨てタスクが alembic で合わせる。RDS は VPC の外から届かない。
+# db スタックとコーパスの投入はここでは流さない。手元から行う。
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prtimes-hackathon-app
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_STACK: prtimes-hackathon-ecr
+  DB_STACK: prtimes-hackathon-db
+  IAM_STACK: prtimes-hackathon-oidc
+  ROLES_STACK: prtimes-hackathon-roles
+  WAF_STACK: prtimes-hackathon-waf
+  APP_STACK: prtimes-hackathon-app
+  MIGRATE_FAMILY: prtimes-hackathon-2026summer-migrate
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+
+      - name: バックエンドの lint とテスト
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest -q
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: フロントの型検査
+        working-directory: frontend
+        run: |
+          bun install --frozen-lockfile
+          bunx tsc --noEmit
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # このジョブだけが AWS のロールを引ける
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ECR スタックを作る(無ければ)
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/ecr.yaml \
+            --stack-name "$ECR_STACK" \
+            --no-fail-on-empty-changeset
+
+      - uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      - name: イメージをビルドして push
+        id: image
+        run: |
+          repo=$(aws cloudformation describe-stacks --stack-name "$ECR_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`RepositoryUri`].OutputValue' --output text)
+          uri="$repo:${GITHUB_SHA::12}"
+          docker build --platform linux/amd64 -t "$uri" backend/
+          docker push "$uri"
+          echo "uri=$uri" >> "$GITHUB_OUTPUT"
+
+      # CLOUDFRONT スコープの WebACL は us-east-1 にしか作れない
+      - name: WAF スタックを流す(us-east-1)
+        run: |
+          aws cloudformation deploy --region us-east-1 \
+            --template-file infra/waf.yaml \
+            --stack-name "$WAF_STACK" \
+            --no-fail-on-empty-changeset
+
+      - name: VPC に紐づく値を引く
+        id: net
+        env:
+          VPC_ID: ${{ secrets.VPC_ID }}
+        run: |
+          pl=$(aws ec2 describe-managed-prefix-lists \
+            --filters Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing \
+            --query 'PrefixLists[0].PrefixListId' --output text)
+          igw=$(aws ec2 describe-internet-gateways \
+            --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+            --query 'InternetGateways[0].InternetGatewayId' --output text)
+          dbsg=$(aws cloudformation describe-stacks --stack-name "$DB_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`SecurityGroupId`].OutputValue' --output text)
+          exec_role=$(aws cloudformation describe-stacks --stack-name "$ROLES_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`ExecutionRoleArn`].OutputValue' --output text)
+          task_role=$(aws cloudformation describe-stacks --stack-name "$ROLES_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`TaskRoleArn`].OutputValue' --output text)
+          acl=$(aws cloudformation describe-stacks --region us-east-1 --stack-name "$WAF_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebAclArn`].OutputValue' --output text)
+          verify=$(aws ssm get-parameter --name /prtimes-hackathon/origin-verify \
+            --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$verify"
+          # 値が無いのに true にするとタスクが起動できない
+          if aws ssm get-parameter --name /prtimes-hackathon/google-client-id >/dev/null 2>&1; then
+            echo "calendar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "calendar=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "prefix_list=$pl" >> "$GITHUB_OUTPUT"
+          echo "igw=$igw" >> "$GITHUB_OUTPUT"
+          echo "db_sg=$dbsg" >> "$GITHUB_OUTPUT"
+          echo "exec_role=$exec_role" >> "$GITHUB_OUTPUT"
+          echo "task_role=$task_role" >> "$GITHUB_OUTPUT"
+          echo "web_acl=$acl" >> "$GITHUB_OUTPUT"
+          echo "verify=$verify" >> "$GITHUB_OUTPUT"
+
+      # 新しいコードを載せる前に当てる。落ちればここで止まり, 本番は旧コード旧スキーマのまま残る
+      - name: マイグレーションを流す
+        env:
+          IMAGE: ${{ steps.image.outputs.uri }}
+        run: .github/scripts/migrate.sh
+
+      - name: app スタックを流す
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/app.yaml \
+            --stack-name "$APP_STACK" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              VpcId='${{ secrets.VPC_ID }}' \
+              ExistingPublicSubnetId='${{ secrets.PUBLIC_SUBNET_ID }}' \
+              InternetGatewayId='${{ steps.net.outputs.igw }}' \
+              CloudFrontPrefixListId='${{ steps.net.outputs.prefix_list }}' \
+              DbSecurityGroupId='${{ steps.net.outputs.db_sg }}' \
+              ExecutionRoleArn='${{ steps.net.outputs.exec_role }}' \
+              TaskRoleArn='${{ steps.net.outputs.task_role }}' \
+              WebAclArn='${{ steps.net.outputs.web_acl }}' \
+              OriginVerifySecret='${{ steps.net.outputs.verify }}' \
+              GoogleCalendarEnabled='${{ steps.net.outputs.calendar }}' \
+              ImageUri='${{ steps.image.outputs.uri }}'
+
+      - name: スタックの出力を読む
+        id: stack
+        # 既定のシェルは bash -e で pipefail が付かない。明示するとパイプ左側の失敗も拾う
+        shell: bash
+        run: |
+          aws cloudformation describe-stacks --stack-name "$APP_STACK" \
+            --query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' --output text \
+            | while read -r key value; do
+                case "$key" in
+                  AppUrl)             echo "app_url=$value" ;;
+                  FrontendBucketName) echo "bucket=$value" ;;
+                  DistributionId)     echo "distribution=$value" ;;
+                  ClusterName)        echo "cluster=$value" ;;
+                  ServiceName)        echo "service=$value" ;;
+                esac
+              done >> "$GITHUB_OUTPUT"
+
+      # 同じコミットを流し直すと change set が空になり, 新しいイメージでも入れ替わらない
+      - name: サービスを必ず入れ替える
+        env:
+          CLUSTER: ${{ steps.stack.outputs.cluster }}
+          SERVICE: ${{ steps.stack.outputs.service }}
+        run: |
+          aws ecs update-service --force-new-deployment \
+            --cluster "$CLUSTER" --service "$SERVICE" >/dev/null
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: フロントをビルド
+        working-directory: frontend
+        # VITE_API_BASE は渡さない。CloudFront が /api/* を同じオリジンで回すので空でよい
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: S3 へ同期
+        env:
+          BUCKET: ${{ steps.stack.outputs.bucket }}
+        run: |
+          aws s3 sync frontend/dist "s3://$BUCKET" --delete \
+            --cache-control 'public,max-age=300'
+          aws s3 sync frontend/dist/assets "s3://$BUCKET/assets" \
+            --cache-control 'public,max-age=31536000,immutable'
+          aws s3 cp frontend/dist/index.html "s3://$BUCKET/index.html" \
+            --cache-control 'no-cache'
+
+      - name: CloudFront のキャッシュを飛ばす
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id '${{ steps.stack.outputs.distribution }}' \
+            --paths '/*' >/dev/null
+
+      - name: 疎通を確かめる
+        env:
+          APP_URL: ${{ steps.stack.outputs.app_url }}
+        run: |
+          for i in $(seq 1 24); do
+            if curl -fsS --max-time 10 "$APP_URL/api/health"; then
+              echo
+              echo "OK: $APP_URL"
+              echo "### デプロイ完了: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "まだ応答なし ($i/24). 15秒待つ"
+            sleep 15
+          done
+          echo "::error::$APP_URL/api/health が応答しない"
+          exit 1

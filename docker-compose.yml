@@ -1,0 +1,69 @@
+name: prtimes-hackathon
+
+services:
+  # 本番の RDS にあたる。踏み台のトンネル無しで開発を完結させる
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: prtimes-hackathon-db
+    environment:
+      POSTGRES_USER: prtimes
+      POSTGRES_PASSWORD: prtimes
+      POSTGRES_DB: app
+    ports:
+      - "15433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prtimes -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+    container_name: prtimes-hackathon-migrate
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://prtimes:prtimes@db:5432/app}
+      # alembic は使わないが Settings が必須にしている
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?.env に OPENAI_API_KEY が無い}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: prtimes-hackathon-backend
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?.env に OPENAI_API_KEY が無い}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://prtimes:prtimes@db:5432/app}
+      # compose の既定値はクォートを剥がさない。.env と違い引用符を付けない
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-["http://localhost:5173"]}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/calendar/oauth/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # 手元は demo。名前だけのログインが開く。本番の設定には入れない
+      APP_ENV: ${APP_ENV:-demo}
+      # glibc malloc arena 数を制限して RSS 単調増加を抑える
+      MALLOC_ARENA_MAX: "2"
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    mem_limit: 1024m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pgdata:

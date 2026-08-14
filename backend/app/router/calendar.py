@@ -1,0 +1,92 @@
+from fastapi import APIRouter, HTTPException, Request, status
+
+from app.calendar import create_event, events, save_draft, service
+from app.dependencies import CurrentUser, DbSessionDep, get_current_user
+from app.schema import PlanDraft
+from app.schema.calendar import CalendarEvent, CalendarEvents, CalendarStatus, EventCreate, EventQuery
+from app.settings import settings
+
+router = APIRouter(prefix="/api/calendar", tags=["calendar"])
+
+
+@router.get("/status")
+async def calendar_status(request: Request, db: DbSessionDep) -> CalendarStatus:
+    """ログイン済みか, この環境で連携が使えるか, この人が連携済みかを返す。
+
+    未ログインでも 401 にせず signed_in=false を返す。ログインボタンを出す判断に使うため。
+
+    Args:
+        request: セッション Cookie を読むために使う。
+        db: データベースセッション。
+
+    Returns:
+        ログインと連携の状況。
+    """
+    configured = bool(settings.GOOGLE_CLIENT_ID)
+    demo = settings.demo_enabled
+
+    try:
+        user = await get_current_user(request, db)
+    except Exception:  # ruff: ignore[blind-except] — 未ログインも失効も同じに扱う
+        return CalendarStatus(signed_in=False, configured=configured, connected=False, demo=demo)
+
+    return CalendarStatus(
+        signed_in=True,
+        configured=configured,
+        connected=await service(db, user.id) is not None,
+        demo=demo,
+    )
+
+
+@router.post("/events")
+async def calendar_events(query: EventQuery, user: CurrentUser, db: DbSessionDep) -> CalendarEvents:
+    """ログイン中の本人の予定だけを返す。
+
+    Args:
+        query: 取得する期間。
+        user: セッションから復元したユーザー。
+        db: データベースセッション。
+
+    Returns:
+        Google の連携状態と予定。連携していなくても自分で足した予定は返る。
+    """
+    found = await events(db, user.id, time_min=query.time_min, time_max=query.time_max)
+
+    return CalendarEvents(connected=await service(db, user.id) is not None, events=found)
+
+
+@router.post("/plans", status_code=status.HTTP_201_CREATED)
+async def add_plan(payload: EventCreate, user: CurrentUser, db: DbSessionDep) -> CalendarEvent:
+    """このアプリに予定を1件足す。Google 側には書き込まない。
+
+    Args:
+        payload: 画面から来た内容。
+        user: セッションから復元したユーザー。
+        db: データベースセッション。
+
+    Returns:
+        保存した予定。
+    """
+    return await create_event(db, user.id, payload)
+
+
+@router.put("/plans/{event_id}/draft")
+async def put_draft(event_id: str, draft: PlanDraft, user: CurrentUser, db: DbSessionDep) -> CalendarEvent:
+    """壁打ちで埋めた内容をその予定に残す。
+
+    Args:
+        event_id: 自分で足した予定なら UUID, Google 由来なら向こうの予定ID。
+        draft: 壁打ちで埋めた内容。
+        user: セッションから復元したユーザー。
+        db: データベースセッション。
+
+    Returns:
+        更新後の予定。
+
+    Raises:
+        HTTPException: 本人の予定に見つからないとき。
+    """
+    saved = await save_draft(db, user.id, event_id, draft)
+    if saved is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="その予定は見つかりません")
+    return saved

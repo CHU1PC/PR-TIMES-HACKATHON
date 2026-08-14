@@ -1,0 +1,1 @@
+{"description":"聞き取りの1往復。","properties":{"answer":{"description":"相手の返答","title":"Answer","type":"string"},"question":{"description":"こちらが聞いたこと","title":"Question","type":"string"}},"required":["question","answer"],"title":"Exchange","type":"object","x-readme-ref-name":"Exchange"}

@@ -1,0 +1,31 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# ETL 出力(RDS由来のデータはコミットしない)
+data/
+
+# misc
+# draw.io が編集中に作る退避ファイル
+.$*.drawio.bkp
+.$*.drawio.dtmp
+.DS_Store
+*.log
+
+# 計画メモ(ツールのスクラッチ)
+.hermes/

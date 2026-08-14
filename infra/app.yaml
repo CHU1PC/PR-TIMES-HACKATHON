@@ -1,0 +1,596 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: フロント(S3+CloudFront)とバックエンド(ALB+ECS Fargate). VPC / サブネット / RDS は既存のものを使う
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: prtimes-hackathon-2026summer
+
+  ShortName:
+    Type: String
+    Default: prtimes-hack
+    MaxLength: 20
+    Description: ALB とターゲットグループの名前に使う. これらは32文字までしか入らない
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: 既存 VPC の ID
+
+  ExistingPublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: 既存のパブリックサブネット (ap-northeast-1a). VPC にはこれ1枚しかない
+
+  InternetGatewayId:
+    Type: String
+    AllowedPattern: "^igw-[0-9a-f]+$"
+    Description: 新設サブネットの 0.0.0.0/0 を向ける既存の IGW
+
+  NewPublicSubnetCidr:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: >-
+      ALB は AZ 違いのサブネットが2枚必要だが既存は1枚しかないので, もう1枚をここに作る.
+      10.0.0.0/24 (public-a) と 10.0.10.0/24, 10.0.20.0/24 (private) が使用済み
+
+  NewPublicSubnetAz:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: ap-northeast-1c
+
+  CloudFrontPrefixListId:
+    Type: String
+    AllowedPattern: "^pl-[0-9a-f]+$"
+    Description: >-
+      CloudFront のオリジン向け IP レンジ. 次で引ける:
+      aws ec2 describe-managed-prefix-lists --filters
+      Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing
+      --query 'PrefixLists[0].PrefixListId' --output text
+
+  ImageUri:
+    Type: String
+    Description: ECR のイメージ URI. タグまで含める. CI が git sha を渡す
+
+  WebAclArn:
+    Type: String
+    Description: waf スタック (us-east-1) が作った WebACL の ARN
+
+  OriginVerifySecret:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: >-
+      CloudFront が付ける秘密のヘッダ. ALB はこれが一致しないリクエストを 403 で落とす.
+      SG は CloudFront 全体を許可しているので, これが無いと他人の CloudFront から直接届く
+
+  ExecutionRoleArn:
+    Type: String
+    Description: roles スタックが作った実行ロール. CI はロールを作れないので ARN で受け取る
+
+  TaskRoleArn:
+    Type: String
+    Description: roles スタックが作ったタスクロール
+
+  DbSecurityGroupId:
+    Type: String
+    AllowedPattern: "^sg-[0-9a-f]+$"
+    Description: db スタックが作ったコーパス DB の SG. ここへ「タスクから :5432」を1本足す
+
+  OpenAiParameterName:
+    Type: String
+    Default: /prtimes-hackathon/openai-api-key
+    Description: SecureString で置いた OpenAI のキー. 値はここには書かない
+
+  DatabaseUrlParameterName:
+    Type: String
+    Default: /prtimes-hackathon/database-url
+    Description: SecureString で置いたコーパス DB の接続 URL. 値はここには書かない
+
+  GoogleClientIdParameterName:
+    Type: String
+    Default: /prtimes-hackathon/google-client-id
+    Description: SecureString で置いた OAuth のクライアント ID. 値はここには書かない
+
+  GoogleClientSecretParameterName:
+    Type: String
+    Default: /prtimes-hackathon/google-client-secret
+    Description: SecureString で置いた OAuth のシークレット. 値はここには書かない
+
+  # 値が無いのに true にするとタスクが起動できない
+  GoogleCalendarEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: カレンダー連携を有効にするか. CI がパラメータの有無を見て自動で決める
+
+  TaskCpu:
+    Type: String
+    Default: "512"
+    AllowedValues: ["256", "512", "1024"]
+
+  TaskMemory:
+    Type: String
+    Default: "1024"
+    AllowedValues: ["512", "1024", "2048"]
+
+  MinTasks:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 4
+    Description: 常時動かす台数. MinTasks と MaxTasks を 0 にすると課金を止められる
+
+  MaxTasks:
+    Type: Number
+    Default: 4
+    MinValue: 0
+    MaxValue: 8
+    Description: 混んだときに増やせる上限
+
+  RequestsPerTaskPerMinute:
+    Type: Number
+    Default: 60
+    MinValue: 10
+    Description: >-
+      1台あたり毎分このリクエスト数を超えると増やす.
+      CPU 基準にしない: 応答の6〜8秒はほぼ OpenAI 待ちで CPU が動かず, 一生発火しない
+
+Conditions:
+  WithGoogleCalendar: !Equals [!Ref GoogleCalendarEnabled, "true"]
+
+Resources:
+  # ===========================================================================
+  # フロント: S3 + CloudFront
+  # ===========================================================================
+
+  # バケットは公開しない。CloudFront だけが OAC で読む
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "${NamePrefix}-frontend-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # SourceArn を付けないと, 他人の CloudFront からも読めてしまう
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${NamePrefix}-frontend"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Ref NamePrefix
+        WebACLId: !Ref WebAclArn
+        HttpVersion: http2
+        # 日本を含む最小構成. PriceClass_All より安い
+        PriceClass: PriceClass_200
+        DefaultRootObject: index.html
+        Origins:
+          - Id: s3-frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+          - Id: alb-backend
+            DomainName: !GetAtt LoadBalancer.DNSName
+            # これが無いリクエストは ALB が 403 で落とす
+            OriginCustomHeaders:
+              - HeaderName: X-Origin-Verify
+                HeaderValue: !Ref OriginVerifySecret
+            CustomOriginConfig:
+              OriginProtocolPolicy: http-only
+              HTTPPort: 80
+              # LLM の応答は数十秒かかる. 既定の30秒だと壁打ちが切れる
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 60
+        DefaultCacheBehavior:
+          TargetOriginId: s3-frontend
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          Compress: true
+          # AWS 管理ポリシー CachingOptimized. 実在確認は aws cloudfront list-cache-policies --type managed
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: alb-backend
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            Compress: true
+            # CachingDisabled / AllViewerExceptHostHeader
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        CustomErrorResponses:
+          # OAC を付けた S3 は, 鍵が無いとき 404 ではなく 403 を返す。
+          # フロントは自前ルータなので /sparring を直接開けるよう index.html に寄せる。
+          # 404 は写さない。写すと API の 404 まで index.html になってしまう
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+
+  # ===========================================================================
+  # ネットワーク: 足りないパブリックサブネットを1枚だけ足す
+  #
+  # 既存のサブネットにもルートテーブルにも触らない。追加するだけにして,
+  # 同じ VPC にいる pgAdmin の EC2 と RDS に影響が出ないようにする
+  # ===========================================================================
+
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Ref NewPublicSubnetCidr
+      AvailabilityZone: !Ref NewPublicSubnetAz
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-public-c"
+        - Key: Project
+          Value: prtimes-hackathon
+
+  # 既存のルートテーブルに相乗りしない。関連付けを書き換えると既存サブネットに波及する
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-public"
+        - Key: Project
+          Value: prtimes-hackathon
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGatewayId
+
+  PublicSubnetCRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTable
+
+  # ===========================================================================
+  # ネットワーク: セキュリティグループ(矢印1本 = inbound 1本)
+  # ===========================================================================
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      # CloudFront からだけ ALB に入れる(AWS は説明文に ASCII しか許さない)
+      GroupDescription: Allow ALB inbound from CloudFront only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # CloudFront のエッジからのみ
+        - Description: CloudFront edge locations only
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-alb"
+        - Key: Project
+          Value: prtimes-hackathon
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow task inbound from ALB only
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-task"
+        - Key: Project
+          Value: prtimes-hackathon
+
+  TaskIngressFromAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TaskSecurityGroup
+      Description: Health check and forwarding from the ALB
+      IpProtocol: tcp
+      FromPort: 8000
+      ToPort: 8000
+      SourceSecurityGroupId: !Ref AlbSecurityGroup
+
+  DbIngressFromTask:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DbSecurityGroupId
+      # タスクからのコーパス検索
+      Description: Corpus search from the ECS task
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref TaskSecurityGroup
+
+  # ===========================================================================
+  # バックエンド: ALB + ECS Fargate
+  # ===========================================================================
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ShortName}-alb"
+      Type: application
+      Scheme: internet-facing
+      Subnets: [!Ref ExistingPublicSubnetId, !Ref PublicSubnetC]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "120"
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ShortName}-tg"
+      VpcId: !Ref VpcId
+      Port: 8000
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /api/health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "60"
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      # 既定で落とし, 私たちの CloudFront から来たものだけをルールで通す
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: "403"
+            ContentType: text/plain
+            MessageBody: Forbidden
+
+  ListenerRuleFromOurCloudFront:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref Listener
+      Priority: 1
+      Conditions:
+        - Field: http-header
+          HttpHeaderConfig:
+            HttpHeaderName: X-Origin-Verify
+            Values: [!Ref OriginVerifySecret]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/ecs/${NamePrefix}-backend"
+      RetentionInDays: 7
+
+  # イメージの取得とキーの注入を行うのはこちら。アプリのコードはこのロールを使わない
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-backend"
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        # CI のランナーが x86 なので, エミュレーション無しで積めるこちらに揃える
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      TaskRoleArn: !Ref TaskRoleArn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            # 本番は CloudFront が同一オリジンで配るので CORS は通らないが,
+            # ALB を直に叩いて切り分けるときに要る
+            - Name: ALLOWED_ORIGINS
+              Value: !Sub '["https://${Distribution.DomainName}"]'
+            - Name: MALLOC_ARENA_MAX
+              Value: "2"
+            # Console の「承認済みのリダイレクト URI」と完全一致していないと弾かれる
+            - Name: GOOGLE_REDIRECT_URI
+              Value: !Sub "https://${Distribution.DomainName}/api/calendar/oauth/callback"
+            - Name: FRONTEND_URL
+              Value: !Sub "https://${Distribution.DomainName}"
+            - Name: COOKIE_SECURE
+              Value: "true"
+          Secrets:
+            # 値はタスク起動時に Parameter Store から入る。ここにも CI にも平文は無い
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
+            - !If
+              - WithGoogleCalendar
+              - Name: GOOGLE_CLIENT_ID
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientIdParameterName}"
+              - !Ref AWS::NoValue
+            - !If
+              - WithGoogleCalendar
+              - Name: GOOGLE_CLIENT_SECRET
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientSecretParameterName}"
+              - !Ref AWS::NoValue
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: backend
+
+  # 本番と同じイメージ・同じ SG で alembic を1回だけ流す。CI が RunTask で起こす
+  MigrationTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-migrate"
+      Cpu: "512"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      TaskRoleArn: !Ref TaskRoleArn
+      ContainerDefinitions:
+        - Name: migrate
+          Image: !Ref ImageUri
+          Essential: true
+          Command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DatabaseUrlParameterName}"
+            # env.py は Settings 経由で読むので, 使わないが必須項目として要る
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OpenAiParameterName}"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: migrate
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${NamePrefix}-cluster"
+
+  Service:
+    Type: AWS::ECS::Service
+    # リスナーより先に作ると, 登録先が無いと言われて失敗する
+    DependsOn: Listener
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-backend"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: !Ref MinTasks
+      # 起動直後のヘルスチェック失敗で殺されないよう猶予を置く
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!Ref ExistingPublicSubnetId, !Ref PublicSubnetC]
+          SecurityGroups: [!Ref TaskSecurityGroup]
+      LoadBalancers:
+        - ContainerName: backend
+          ContainerPort: 8000
+          TargetGroupArn: !Ref TargetGroup
+
+  # ===========================================================================
+  # オートスケーリング
+  # ===========================================================================
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      ResourceId: !Sub "service/${Cluster}/${Service.Name}"
+      MinCapacity: !Ref MinTasks
+      MaxCapacity: !Ref MaxTasks
+
+  # ターゲット追跡. CloudWatch のアラームは Application Auto Scaling が自分で作る
+  ScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${NamePrefix}-requests-per-task"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: !Ref RequestsPerTaskPerMinute
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          # app/<ALB名>/<ID>/targetgroup/<TG名>/<ID> の形にする
+          ResourceLabel: !Join
+            - "/"
+            - - !GetAtt LoadBalancer.LoadBalancerFullName
+              - !GetAtt TargetGroup.TargetGroupFullName
+        # 増やすのは速く, 減らすのは遅く. 減らしすぎて増やし直す振動を避ける
+        ScaleOutCooldown: 60
+        ScaleInCooldown: 300
+
+Outputs:
+  AppUrl:
+    Description: デモで開く URL
+    Value: !Sub "https://${Distribution.DomainName}"
+
+  FrontendBucketName:
+    Description: フロントの成果物を aws s3 sync する先
+    Value: !Ref FrontendBucket
+
+  DistributionId:
+    Description: キャッシュを飛ばすときに使う
+    Value: !Ref Distribution
+
+  ClusterName:
+    Value: !Ref Cluster
+
+  ServiceName:
+    Value: !GetAtt Service.Name
+
+  AlbDnsName:
+    Description: CloudFront を通さずに切り分けるとき用. SG で CloudFront 以外は弾かれる
+    Value: !GetAtt LoadBalancer.DNSName
+
+  TaskSubnetIds:
+    Value: !Join [",", [!Ref ExistingPublicSubnetId, !Ref PublicSubnetC]]
+
+  TaskSecurityGroupId:
+    Description: DB 側がこの SG からの 5432 を通す
+    Value: !Ref TaskSecurityGroup
+
+  LogGroupName:
+    Value: !Ref LogGroup

@@ -1,0 +1,6 @@
+node_modules/
+# dist はコンテナ内で作り直す. ホストの古い成果物を持ち込まない
+dist/
+.vite/
+.env
+*.log

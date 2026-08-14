@@ -1,0 +1,119 @@
+[project]
+name = "prtimes-hackathon"
+version = "0.1.0"
+description = "PR TIMES Hackathon 2026 Summer / Team1"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    # CI が本番のイメージのまま upgrade head を流すので, 実行時側に置く
+    "alembic>=1.19.1",
+    "fastapi[standard]>=0.115",
+    "google-api-python-client>=2.198.0",
+    "google-auth-httplib2>=0.4.1",
+    "httpx>=0.28",
+    "langchain-core>=1.5.4",
+    "langchain-openai>=1.4.3",
+    "loguru>=0.7.3",
+    "numpy>=2.1",
+    "pgvector>=0.3",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "ruff>=0.15",
+    # asyncio extra が greenlet を連れてくる。arm64 では sqlalchemy 単体だと入らず async が動かない
+    "sqlalchemy[asyncio]>=2.0",
+    "sqlmodel>=0.0.39",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.15",
+]
+etl = [
+    "duckdb>=1.1",
+    "fugashi[unidic-lite]>=1.5.2",
+    "psycopg[binary]>=3.2",
+]
+test = [
+    "pytest>=8.3",
+    "fastapi[standard]>=0.115",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+]
+# ml/ の学習・評価専用。推論に要るのは lightgbm と numpy だけで, 残りはオフライン側
+ml = [
+    "lightgbm>=4.5",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "scikit-learn>=1.5",
+    "scipy>=1.14",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.pyrefly]
+project-includes = ["app", "etl", "tests"]
+python-version = "3.13.0"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py313"
+
+[tool.ruff.lint]
+preview = true
+select = ["ALL"]
+ignore = [
+    "missing-trailing-comma",                     # conflicts with formatter
+    "single-line-implicit-string-concatenation",  # conflicts with formatter
+    "undocumented-public-module",
+    "undocumented-public-package",
+    "incorrect-blank-line-before-class",          # conflicts with blank-line-before-class
+    "multi-line-summary-second-line",             # conflicts with multi-line-summary-first-line
+    "missing-copyright-notice",                   # ハッカソン成果物のため不要
+    "commented-out-code",                         # 日本語のセクションコメントが誤検知される
+    "too-many-arguments",                         # プロンプト構築関数等で自然に多引数になる
+    "too-many-positional-arguments",              # 同上
+    "missing-todo-link",                          # Issue リンク強制は不要
+    "missing-terminal-punctuation",               # 日本語 docstring は句点で終わるため誤検知される
+    "ambiguous-unicode-character-string",         # 日本語の全角文字が誤検知される
+    "ambiguous-unicode-character-docstring",      # 同上
+    "ambiguous-unicode-character-comment",        # 同上
+]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+# alembic は env.py と versions/ をスクリプトとして読み込む。__init__.py を置くと壊れる
+"alembic/env.py" = ["implicit-namespace-package"]
+# 自動生成された migration は書式も命名も alembic の流儀に従う
+"alembic/versions/*" = ["implicit-namespace-package", "invalid-module-name", "undocumented-public-function"]
+"tests/**" = ["assert"]  # pytest は assert が前提のため許容
+# print: ETL は進捗を標準出力に出す前提のバッチのため logger を通さない.
+# hardcoded-sql-expression: 埋め込むのは分割レンジの整数のみで, 外部入力を連結しない.
+"etl/**" = ["print", "hardcoded-sql-expression"]
+# hardcoded-sql-expression: 埋め込むのは加点幅のモジュール定数のみで, 外部入力を連結しない.
+"app/retrieval/**" = ["hardcoded-sql-expression"]
+# print: 学習・評価はオフラインのバッチで, 結果表を標準出力に出す前提のため logger を通さない.
+# suspicious-pickle-usage: joblib で保存するのは自分で学習した係数のみで, 外部の pickle を読まない.
+"ml/**" = ["print", "suspicious-pickle-usage"]
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.pytest_cache/
+tests/
+etl/
+.env
+*.md
+# ETL 出力. analysis.duckdb が 400MB 超あるので context に載せない
+data/
+node_modules/
+dist/

@@ -1,0 +1,1401 @@
+{
+  "components": {
+    "schemas": {
+      "CalendarEvent": {
+        "description": "カレンダーの予定1件。",
+        "properties": {
+          "description": {
+            "description": "予定の詳細。無ければ空文字",
+            "title": "Description",
+            "type": "string"
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanDraft"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "壁打ちで埋めた内容。一度答えた項目は聞き直さない"
+          },
+          "end": {
+            "description": "終了。終日予定は日付だけになる",
+            "title": "End",
+            "type": "string"
+          },
+          "htmlLink": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Google カレンダーで開く URL",
+            "title": "Htmllink"
+          },
+          "id": {
+            "description": "Google 側の予定ID",
+            "title": "Id",
+            "type": "string"
+          },
+          "location": {
+            "description": "場所。無ければ空文字",
+            "title": "Location",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "似た事例がどれだけ読まれたか。0〜1。数値は画面に出さない",
+            "title": "Score"
+          },
+          "start": {
+            "description": "開始。終日予定は日付だけになる",
+            "title": "Start",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "confirmed / tentative / cancelled",
+            "title": "Status"
+          },
+          "title": {
+            "description": "予定の件名。無題なら (タイトルなし)",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "location",
+          "start",
+          "end",
+          "htmlLink",
+          "status",
+          "score",
+          "draft"
+        ],
+        "title": "CalendarEvent",
+        "type": "object"
+      },
+      "CalendarEvents": {
+        "description": "指定期間の予定。",
+        "properties": {
+          "connected": {
+            "description": "Google と連携済みか。デモでログインしただけなら false",
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "events": {
+            "description": "期間内の予定。Google の分と自分で足した分の両方",
+            "items": {
+              "$ref": "#/components/schemas/CalendarEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connected",
+          "events"
+        ],
+        "title": "CalendarEvents",
+        "type": "object"
+      },
+      "CalendarStatus": {
+        "description": "ログインと連携の状況。",
+        "properties": {
+          "configured": {
+            "description": "この環境で Google 連携が使えるか。false なら連携ボタンを出さない",
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "connected": {
+            "description": "Google と連携済みか。デモでログインしただけなら false",
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "demo": {
+            "description": "Google なしのデモログインを開いているか。false ならボタンを出さない",
+            "title": "Demo",
+            "type": "boolean"
+          },
+          "signed_in": {
+            "description": "ログイン済みか。予定を引けるかはこれで決まる",
+            "title": "Signed In",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signed_in",
+          "configured",
+          "connected",
+          "demo"
+        ],
+        "title": "CalendarStatus",
+        "type": "object"
+      },
+      "Candidate": {
+        "description": "回答から抽出した予定候補。",
+        "properties": {
+          "category": {
+            "description": "requirements §6.2 の8分類",
+            "enum": [
+              "販売・提供の開始/拡大",
+              "提携・連携の開始",
+              "場所・チャネルの追加",
+              "商品・サービスの改訂",
+              "人・組織の変化",
+              "受賞・認定",
+              "数字の節目",
+              "外部イベント出展"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "reason": {
+            "description": "なぜ発信できるかを1行で",
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "description": "根拠になった回答の引用",
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "description": "予定として登録する一文",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "category",
+          "source",
+          "reason"
+        ],
+        "title": "Candidate",
+        "type": "object"
+      },
+      "DemoLogin": {
+        "description": "デモでログインする人。名前だけで identity を作る。",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "表示名。空なら既定の名前を使う",
+            "title": "Name"
+          }
+        },
+        "title": "DemoLogin",
+        "type": "object"
+      },
+      "EventCreate": {
+        "description": "画面から足す予定1件。時刻は RFC3339 で受ける。",
+        "properties": {
+          "allDay": {
+            "default": false,
+            "description": "終日の予定か",
+            "title": "Allday",
+            "type": "boolean"
+          },
+          "description": {
+            "default": "",
+            "description": "予定の詳細。無ければ空文字",
+            "title": "Description",
+            "type": "string"
+          },
+          "endsAt": {
+            "description": "終了 (RFC3339)",
+            "title": "Endsat",
+            "type": "string"
+          },
+          "location": {
+            "default": "",
+            "description": "場所。市区町村まで入ると地元紙が拾う",
+            "maxLength": 255,
+            "title": "Location",
+            "type": "string"
+          },
+          "startsAt": {
+            "description": "開始 (RFC3339)",
+            "title": "Startsat",
+            "type": "string"
+          },
+          "title": {
+            "description": "予定の件名",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "startsAt",
+          "endsAt"
+        ],
+        "title": "EventCreate",
+        "type": "object"
+      },
+      "EventQuery": {
+        "description": "予定を引く期間。キーは Google Calendar API の名前に合わせる。",
+        "properties": {
+          "timeMax": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "取得終了時刻 (RFC3339)",
+            "title": "Timemax"
+          },
+          "timeMin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "取得開始時刻 (RFC3339)",
+            "title": "Timemin"
+          }
+        },
+        "title": "EventQuery",
+        "type": "object"
+      },
+      "Exchange": {
+        "description": "聞き取りの1往復。",
+        "properties": {
+          "answer": {
+            "description": "相手の返答",
+            "title": "Answer",
+            "type": "string"
+          },
+          "question": {
+            "description": "こちらが聞いたこと",
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "Exchange",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HearingResponse": {
+        "description": "1往復ぶんの応答。",
+        "properties": {
+          "candidates": {
+            "description": "ここまでに見つかった予定候補",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "done": {
+            "description": "聞き終わったか",
+            "title": "Done",
+            "type": "boolean"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "答えやすくするための例示",
+            "title": "Hint"
+          },
+          "history": {
+            "description": "返答を追加した後の往復履歴",
+            "items": {
+              "$ref": "#/components/schemas/Exchange"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "次に聞くこと。聞き終わったら None",
+            "title": "Question"
+          }
+        },
+        "required": [
+          "history",
+          "question",
+          "hint",
+          "candidates",
+          "done"
+        ],
+        "title": "HearingResponse",
+        "type": "object"
+      },
+      "HearingTurn": {
+        "description": "1往復ぶんの入力。",
+        "properties": {
+          "answer": {
+            "default": "",
+            "description": "直前の質問への返答。初回は空",
+            "title": "Answer",
+            "type": "string"
+          },
+          "history": {
+            "description": "ここまでの往復。初回は空",
+            "items": {
+              "$ref": "#/components/schemas/Exchange"
+            },
+            "title": "History",
+            "type": "array"
+          }
+        },
+        "title": "HearingTurn",
+        "type": "object"
+      },
+      "PlanDraft": {
+        "description": "壁打ちで育てている途中のイベント内容。",
+        "properties": {
+          "novelty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "御社として初めてのこと",
+            "title": "Novelty"
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当日見聞きできそうなこと",
+            "title": "Observation"
+          },
+          "partner": {
+            "description": "社外で関わる相手の名前",
+            "items": {
+              "type": "string"
+            },
+            "title": "Partner",
+            "type": "array"
+          },
+          "people": {
+            "anyOf": [
+              {
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当日その場に人がいるか",
+            "title": "People"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "市区町村または都道府県。オンライン可",
+            "title": "Place"
+          },
+          "retried": {
+            "description": "読み取れず聞き直した項目。2回目で読み取れなければ skipped へ送る",
+            "items": {
+              "enum": [
+                "place",
+                "partner",
+                "people",
+                "novelty",
+                "observation",
+                "video"
+              ],
+              "type": "string"
+            },
+            "title": "Retried",
+            "type": "array"
+          },
+          "skipped": {
+            "description": "聞いたが該当が無かった項目。同じ質問を繰り返さないために覚えておく",
+            "items": {
+              "enum": [
+                "place",
+                "partner",
+                "people",
+                "novelty",
+                "observation",
+                "video"
+              ],
+              "type": "string"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "開始日 YYYY-MM-DD。未定なら None",
+            "title": "Start Date"
+          },
+          "title": {
+            "description": "これからやることを1行で",
+            "title": "Title",
+            "type": "string"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "すでにある動画の有無",
+            "title": "Video"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "PlanDraft",
+        "type": "object"
+      },
+      "ProposalCase": {
+        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。\n\n出すのは取り組みのやり方だけなので, 他社を名指しできる情報は exclude=True で JSON に載せない。\nタイトルと本文は社名を含むことが多く, LLM には渡すが応答には出さない。",
+        "properties": {
+          "business_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "業種名",
+            "title": "Business Category"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "市区町村名",
+            "title": "City"
+          },
+          "media": {
+            "description": "この事例を拾った媒体のうち特徴的なもの",
+            "items": {
+              "type": "string"
+            },
+            "title": "Media",
+            "type": "array"
+          },
+          "prefecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "都道府県名",
+            "title": "Prefecture"
+          },
+          "published_on": {
+            "description": "配信日 YYYY-MM-DD",
+            "title": "Published On",
+            "type": "string"
+          },
+          "release_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "リリース種別名",
+            "title": "Release Type"
+          }
+        },
+        "required": [
+          "published_on",
+          "media"
+        ],
+        "title": "ProposalCase",
+        "type": "object"
+      },
+      "ProposalRequest": {
+        "description": "提案の入力。壁打ちが完了した draft をそのまま渡す。",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/PlanDraft",
+            "description": "壁打ちで埋めたイベント内容"
+          }
+        },
+        "required": [
+          "draft"
+        ],
+        "title": "ProposalRequest",
+        "type": "object"
+      },
+      "ProposalResponse": {
+        "description": "提案の出力。",
+        "properties": {
+          "cases": {
+            "description": "根拠にした事例",
+            "items": {
+              "$ref": "#/components/schemas/ProposalCase"
+            },
+            "title": "Cases",
+            "type": "array"
+          },
+          "media": {
+            "description": "事例群を拾っていた媒体のうち特徴的なもの。件数は付けない(requirements §7)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Media",
+            "type": "array"
+          },
+          "suggestions": {
+            "description": "足せること。3件",
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "suggestions",
+          "cases",
+          "media"
+        ],
+        "title": "ProposalResponse",
+        "type": "object"
+      },
+      "SlotState": {
+        "description": "1スロットの状態。画面のチェックリストになる。",
+        "properties": {
+          "code": {
+            "description": "スロット識別子",
+            "enum": [
+              "place",
+              "partner",
+              "people",
+              "novelty",
+              "observation",
+              "video"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "effect": {
+            "description": "埋まると何が起きるか。数値と効果の断定は書かない",
+            "title": "Effect",
+            "type": "string"
+          },
+          "filled": {
+            "description": "値が入っているか",
+            "title": "Filled",
+            "type": "boolean"
+          },
+          "label": {
+            "description": "顧客に見せる質問文",
+            "title": "Label",
+            "type": "string"
+          },
+          "skipped": {
+            "description": "聞いたが該当が無かったか",
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "tone": {
+            "description": "causal は判定クエリC を通ったスロットのみ",
+            "enum": [
+              "causal",
+              "functional"
+            ],
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "filled",
+          "skipped",
+          "effect",
+          "tone"
+        ],
+        "title": "SlotState",
+        "type": "object"
+      },
+      "SparringForm": {
+        "description": "フォームで一度に受け取る答え。空欄の項目は該当なしとして扱う。",
+        "properties": {
+          "answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "スロットごとの自由記述。書かなかった項目は入れなくてよい",
+            "propertyNames": {
+              "enum": [
+                "place",
+                "partner",
+                "people",
+                "novelty",
+                "observation",
+                "video"
+              ]
+            },
+            "title": "Answers",
+            "type": "object"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/PlanDraft",
+            "description": "いま分かっているイベント内容"
+          }
+        },
+        "required": [
+          "draft"
+        ],
+        "title": "SparringForm",
+        "type": "object"
+      },
+      "SparringResponse": {
+        "description": "1往復ぶんの応答。",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/PlanDraft",
+            "description": "返答を反映した後のイベント内容"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "答えやすくするための例示",
+            "title": "Hint"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "次に聞くこと。全部済んだら None",
+            "title": "Question"
+          },
+          "ready": {
+            "description": "出せる形になったか",
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "slots": {
+            "description": "チェックリスト。SLOT_ORDER の順に並ぶ",
+            "items": {
+              "$ref": "#/components/schemas/SlotState"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "draft",
+          "question",
+          "hint",
+          "slots",
+          "ready"
+        ],
+        "title": "SparringResponse",
+        "type": "object"
+      },
+      "SparringTurn": {
+        "description": "1往復ぶんの入力。",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/PlanDraft",
+            "description": "いま分かっているイベント内容"
+          },
+          "reply": {
+            "default": "",
+            "description": "直前の質問への顧客の返答。初回は空",
+            "title": "Reply",
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft"
+        ],
+        "title": "SparringTurn",
+        "type": "object"
+      },
+      "Suggestion": {
+        "description": "顧客に見せる提案1件。",
+        "properties": {
+          "action": {
+            "description": "この取り組みに足すこと。1文の命令形にしない, 提案の形にする",
+            "title": "Action",
+            "type": "string"
+          },
+          "cited": {
+            "description": "根拠にした事例。cases 配列の位置を指す0始まりの添字",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cited",
+            "type": "array"
+          },
+          "reason": {
+            "description": "なぜそれが効くか。事例に即して書く",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "reason",
+          "cited"
+        ],
+        "title": "Suggestion",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "未来のPRネタを作り出すAI",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/calendar/connection": {
+      "delete": {
+        "description": "連携を切る。保存した資格情報を消し, Google 側にも取り消しを伝える。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    204。セッション Cookie を消す。",
+        "operationId": "disconnect_api_calendar_connection_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disconnect",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/demo-login": {
+      "post": {
+        "description": "Google を通さず名前だけでログインする。初めての名前なら予定を積んで返す。\n\nArgs:\n    body: 表示名。空なら既定の名前を使う。\n    request: user-agent と接続元をセッションに残すために使う。\n    db: データベースセッション。\n\nReturns:\n    204。セッション Cookie を張る。\n\nRaises:\n    HTTPException: APP_ENV が demo でないとき。",
+        "operationId": "demo_login_api_calendar_demo_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo Login",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/events": {
+      "post": {
+        "description": "ログイン中の本人の予定だけを返す。\n\nArgs:\n    query: 取得する期間。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    Google の連携状態と予定。連携していなくても自分で足した予定は返る。",
+        "operationId": "calendar_events_api_calendar_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEvents"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Calendar Events",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/login": {
+      "get": {
+        "description": "Google の同意画面へ送る。state はサーバに持たず Cookie で持ち回る。\n\nReturns:\n    認可 URL へのリダイレクト。\n\nRaises:\n    HTTPException: クライアント ID が設定されていないとき 503。",
+        "operationId": "start_oauth_api_calendar_login_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Oauth",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/logout": {
+      "post": {
+        "description": "セッションだけ切る。Google の資格情報は残すので, 入り直せばまた連携済みになる。\n\nセッションが既に切れていても 204 を返す。押しても何も起きない, を避けるため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    204。セッション Cookie を消す。",
+        "operationId": "logout_api_calendar_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/oauth/callback": {
+      "get": {
+        "description": "認可コードを交換し, ユーザーを作ってログインさせ, カレンダーのトークンを保存する。\n\nArgs:\n    request: state の Cookie とクライアント情報を読むために使う。\n    code: Google が返した認可コード。\n    state: Google が返した突き合わせ用の値。\n    db: データベースセッション。\n\nReturns:\n    フロントへのリダイレクト。セッション Cookie を載せる。\n\nRaises:\n    HTTPException: state が一致しないとき 400。交換や ID token の検証に失敗したとき 502。",
+        "operationId": "oauth_callback_api_calendar_oauth_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "title": "State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oauth Callback",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/plans": {
+      "post": {
+        "description": "このアプリに予定を1件足す。Google 側には書き込まない。\n\nArgs:\n    payload: 画面から来た内容。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    保存した予定。",
+        "operationId": "add_plan_api_calendar_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEvent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Plan",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/plans/{event_id}/draft": {
+      "put": {
+        "description": "壁打ちで埋めた内容をその予定に残す。\n\nArgs:\n    event_id: 自分で足した予定なら UUID, Google 由来なら向こうの予定ID。\n    draft: 壁打ちで埋めた内容。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    更新後の予定。\n\nRaises:\n    HTTPException: 本人の予定に見つからないとき。",
+        "operationId": "put_draft_api_calendar_plans__event_id__draft_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEvent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Draft",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/status": {
+      "get": {
+        "description": "ログイン済みか, この環境で連携が使えるか, この人が連携済みかを返す。\n\n未ログインでも 401 にせず signed_in=false を返す。ログインボタンを出す判断に使うため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    ログインと連携の状況。",
+        "operationId": "calendar_status_api_calendar_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Calendar Status",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "疎通確認。DB にも LLM にも触らない。\n\nReturns:\n    {\"ok\": True}。到達性の確認だけに使う。",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Health Api Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/hearing/step": {
+      "post": {
+        "description": "聞き取りを1往復進める。\n\nArgs:\n    turn: ここまでの往復と, 直前の質問への返答。\n\nReturns:\n    更新後の履歴, 次に聞くこと, ここまでの候補。",
+        "operationId": "hearing_step_api_hearing_step_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HearingTurn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HearingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hearing Step",
+        "tags": [
+          "hearing"
+        ]
+      }
+    },
+    "/api/proposal": {
+      "post": {
+        "description": "壁打ちが済んだ予定に対し, 事例を引いて足せる行動を提案する。\n\nArgs:\n    request: 壁打ちで埋めたイベント内容。\n\nReturns:\n    提案3件と, 根拠にした事例。",
+        "operationId": "proposal_api_proposal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Proposal",
+        "tags": [
+          "proposal"
+        ]
+      }
+    },
+    "/api/sparring/fill": {
+      "post": {
+        "description": "フォームの答えをまとめて反映する。粗くて読み取れなかった項目だけ聞き直す。\n\nArgs:\n    form: いま分かっている内容と, スロットごとの答え。\n\nReturns:\n    更新後の内容と, あれば聞き直す質問。",
+        "operationId": "sparring_fill_api_sparring_fill_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sparring Fill",
+        "tags": [
+          "sparring"
+        ]
+      }
+    },
+    "/api/sparring/step": {
+      "post": {
+        "description": "壁打ちを1往復進める。\n\nArgs:\n    turn: いま分かっている内容と, 直前の質問への返答。\n\nReturns:\n    更新後の内容と次に聞くこと。",
+        "operationId": "sparring_step_api_sparring_step_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringTurn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sparring Step",
+        "tags": [
+          "sparring"
+        ]
+      }
+    }
+  }
+}

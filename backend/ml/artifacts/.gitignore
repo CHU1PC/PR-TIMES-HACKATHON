@@ -1,0 +1,6 @@
+# モデルは data/ (gitignore済み) から train.py で作り直せるビルド成果物なので, 25MB をコミットしない。
+# plan_vec.npy は OpenAI を1回叩いた結果で, これが無いと受け入れテストを再現できないため残す
+*
+!.gitignore
+!plan_vec.npy
+!results.json
