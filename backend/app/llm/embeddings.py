@@ -35,3 +35,20 @@ async def embed(text: str) -> np.ndarray:
     """
     response = await client.embeddings.create(model=MODEL, input=text, dimensions=DIMENSIONS)
     return normalize(np.asarray(response.data[0].embedding, dtype=np.float32))
+
+
+async def embed_many(texts: list[str]) -> list[np.ndarray]:
+    """複数をまとめて埋め込む。1ヶ月ぶんの予定を1リクエストで済ませる。
+
+    Args:
+        texts: 埋め込む文字列。空なら API を叩かない。
+
+    Returns:
+        texts と同じ並びの正規化済みベクトル。
+    """
+    if not texts:
+        return []
+    response = await client.embeddings.create(model=MODEL, input=texts, dimensions=DIMENSIONS)
+    # data は index 順に返る保証が無いので並べ直す
+    ordered = sorted(response.data, key=lambda item: item.index)
+    return list(normalize(np.asarray([item.embedding for item in ordered], dtype=np.float32)))
