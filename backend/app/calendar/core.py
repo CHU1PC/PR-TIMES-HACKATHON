@@ -83,7 +83,7 @@ def _stored(row: Event) -> CalendarEvent:
         location=row.location,
         start=starts_at,
         end=ends_at,
-        html_link=None,
+        htmlLink=None,
         status="confirmed",
         score=row.score,
         draft=_draft(row),
@@ -261,7 +261,7 @@ def _event(item: dict) -> CalendarEvent | None:
         location=item.get("location", ""),
         start=starts_at,
         end=ends_at,
-        html_link=item.get("htmlLink"),
+        htmlLink=item.get("htmlLink"),
         status=item.get("status"),
         # 採点も壁打ちも取り込んでから。ここでは埋めない
         score=None,
