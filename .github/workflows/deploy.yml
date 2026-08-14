@@ -179,8 +179,12 @@ jobs:
         env:
           BUCKET: ${{ steps.stack.outputs.bucket }}
         run: |
-          aws s3 sync frontend/dist "s3://$BUCKET" --delete \
+          # --delete しない。開いているタブは古い index.html が指す JS を取りに来るので,
+          # 消すと 403→index.html 書き換えで HTML が返り MIME エラーでアプリごと死ぬ
+          aws s3 sync frontend/dist "s3://$BUCKET" --exclude 'assets/*' \
             --cache-control 'public,max-age=300'
+          # assets は別コマンドで。同じ sync に混ぜると先に 300s で上がった同一内容の
+          # ファイルをスキップし, immutable が付かないまま残る
           aws s3 sync frontend/dist/assets "s3://$BUCKET/assets" \
             --cache-control 'public,max-age=31536000,immutable'
           aws s3 cp frontend/dist/index.html "s3://$BUCKET/index.html" \
