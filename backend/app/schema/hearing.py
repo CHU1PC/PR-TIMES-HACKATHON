@@ -2,19 +2,27 @@ from pydantic import BaseModel, Field
 
 from app.schema.plan import PlanCategory
 
+# history はクライアントが毎回送り直す入力。上限が無いとプロンプトへ無制限に増幅される
+ANSWER_MAX = 2000
+HISTORY_MAX = 30
+
 
 class Exchange(BaseModel):
     """聞き取りの1往復。"""
 
-    question: str = Field(description="こちらが聞いたこと")
-    answer: str = Field(description="相手の返答")
+    question: str = Field(max_length=ANSWER_MAX, description="こちらが聞いたこと")
+    answer: str = Field(max_length=ANSWER_MAX, description="相手の返答")
 
 
 class HearingTurn(BaseModel):
     """1往復ぶんの入力。"""
 
-    history: list[Exchange] = Field(default_factory=list[Exchange], description="ここまでの往復。初回は空")
-    answer: str = Field(default="", description="直前の質問への返答。初回は空")
+    history: list[Exchange] = Field(
+        default_factory=list[Exchange],
+        max_length=HISTORY_MAX,
+        description="ここまでの往復。初回は空",
+    )
+    answer: str = Field(default="", max_length=ANSWER_MAX, description="直前の質問への返答。初回は空")
 
 
 class Candidate(BaseModel):
