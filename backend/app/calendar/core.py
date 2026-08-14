@@ -4,6 +4,7 @@ from uuid import UUID
 
 from googleapiclient.discovery import Resource, build
 from loguru import logger
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
@@ -40,6 +41,24 @@ async def service(db: AsyncSession, user_id: UUID) -> Resource | None:
     return build("calendar", "v3", credentials=credentials)
 
 
+def _draft(row: Event) -> PlanDraft | None:
+    """保存された壁打ちの内容を読む。読めない形は捨ててカレンダーを守る。
+
+    Args:
+        row: events テーブルの1行。
+
+    Returns:
+        壁打ちの内容。無い, またはスキーマが変わって読めなくなっていれば None。
+    """
+    if not row.draft:
+        return None
+    try:
+        return PlanDraft.model_validate(row.draft)
+    except ValidationError:
+        logger.warning("draft を読めないので捨てる event={}", row.id)
+        return None
+
+
 def _stored(row: Event) -> CalendarEvent:
     """DB の1件を API の型に移す。
 
@@ -67,7 +86,7 @@ def _stored(row: Event) -> CalendarEvent:
         html_link=None,
         status="confirmed",
         score=row.score,
-        draft=PlanDraft.model_validate(row.draft) if row.draft else None,
+        draft=_draft(row),
     )
 
 
