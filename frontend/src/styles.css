@@ -2036,17 +2036,6 @@ textarea:focus-visible {
   color: var(--ink-faint);
 }
 
-@media (max-width: 1120px) {
-  .sparring {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .sparring__side {
-    position: static;
-  }
-}
-
 @media (max-width: 960px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
@@ -2065,7 +2054,12 @@ textarea:focus-visible {
   }
 
   .app-header__inner {
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    height: auto;
     justify-content: space-between;
+    min-height: 76px;
+    padding: 10px 0;
   }
 
   .app-header__brand {
@@ -2083,25 +2077,12 @@ textarea:focus-visible {
 }
 
 @media (max-width: 860px) {
-  .home-actions {
-    grid-template-columns: minmax(0, 1.4fr) minmax(250px, 0.8fr);
-  }
-
   .ranking-item {
     grid-template-columns: 34px 64px minmax(0, 1fr);
   }
 
   .ranking-item__visual {
     width: 64px;
-  }
-
-  .sparring {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .sparring__side {
-    position: static;
   }
 
   .page__title {
@@ -2134,7 +2115,8 @@ textarea:focus-visible {
   }
 
   .app-header__inner {
-    height: 66px;
+    gap: 8px 12px;
+    min-height: 66px;
   }
 
   .app-header__status {
@@ -2147,10 +2129,6 @@ textarea:focus-visible {
 
   .home-page {
     gap: 20px;
-  }
-
-  .home-actions {
-    grid-template-columns: 1fr;
   }
 
   .calendar-card,
@@ -2218,61 +2196,18 @@ textarea:focus-visible {
     gap: 3px;
   }
 
-  .idea-search__art {
-    height: 68px;
-    margin-bottom: -31px;
-    width: 68px;
+  /* 14px のままだと iOS が入力時に画面ごと拡大する */
+  .entry--dashboard .entry__input {
+    font-size: 16px;
   }
 
-  .idea-search__art svg {
-    height: 34px;
-    width: 34px;
-  }
-
-  .workflow__list {
-    grid-template-columns: 1fr;
-  }
-
-  .workflow__item,
-  .workflow__item:first-child,
-  .workflow__item:last-child {
-    min-height: 90px;
-    padding: 14px 38px 14px 58px;
-  }
-
-  .workflow__item + .workflow__item {
-    border-left: 0;
-    border-top: 1px solid #eeeef4;
-  }
-
-  .workflow__icon {
-    height: 38px;
-    left: 4px;
-    position: absolute;
-    top: 17px;
-    width: 38px;
-  }
-
-  .workflow__number {
-    right: 6px;
-    top: 17px;
-  }
-
-  .workflow__item h3 {
-    margin-top: 0;
-  }
-
-  .resume--dashboard .resume__list {
-    grid-template-columns: 1fr;
-  }
-
-  .home-tip {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .home-tip__badge {
-    margin-left: 56px;
+  .proposal__media,
+  .suggestion__action,
+  .suggestion__reason,
+  .evidence__title,
+  .evidence__meta,
+  .evidence__media {
+    overflow-wrap: anywhere;
   }
 }
 
@@ -2362,10 +2297,22 @@ textarea:focus-visible {
   }
 
   .entry--dashboard,
-  .idea-search,
-  .workflow,
   .resume--dashboard {
     padding: 20px;
+  }
+
+  /* 入力欄の横幅を1文字でも広く取る */
+  .slot-fields .slot {
+    padding: 12px;
+  }
+
+  .demo-login {
+    flex: 1 1 100%;
+  }
+
+  .demo-login__input {
+    flex: 1 1 auto;
+    width: auto;
   }
 
   .entry__heading-icon {
@@ -2387,20 +2334,6 @@ textarea:focus-visible {
     text-align: left;
   }
 
-  .workflow__item,
-  .workflow__item:first-child,
-  .workflow__item:last-child {
-    padding-right: 23px;
-  }
-
-  .home-tip__copy {
-    min-width: calc(100% - 58px);
-  }
-
-  .home-tip__badge {
-    margin-left: 0;
-    width: 100%;
-  }
 }
 
 /* Keep the two-color theme authoritative over component-specific tones. */
