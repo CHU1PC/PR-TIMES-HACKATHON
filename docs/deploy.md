@@ -106,9 +106,11 @@ cd backend && uv run alembic revision --autogenerate -m "add users and sessions"
 cd backend
 uv run --group etl --env-file ../.env python -m etl.enrich merge   # 7秒
 
-ep=$(aws rds describe-db-instances --db-instance-identifier prtimes-hackathon-2026summer-app \
+# --region 必須。付けないと ep が空になり, トンネルが転送先なしで張られて分かりにくく壊れる
+ep=$(aws rds describe-db-instances --region ap-northeast-1 \
+  --db-instance-identifier prtimes-hackathon-2026summer-app \
   --query 'DBInstances[0].Endpoint.Address' --output text)
-ssh -i ~/.ssh/prtimes/hackathon.pem -N -f -L "15434:$ep:5432" ubuntu@13.112.91.188
+test -n "$ep" && ssh -i ~/.ssh/prtimes/hackathon.pem -N -f -L "15434:$ep:5432" ubuntu@13.112.91.188
 
 DATABASE_URL="postgresql://prtimes:${PW}@127.0.0.1:15434/app" \
   uv run --group etl python -m etl.load_corpus                     # 34秒
