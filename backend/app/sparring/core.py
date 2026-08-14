@@ -72,8 +72,86 @@ def slot_states(draft: PlanDraft) -> list[SlotState]:
     ]
 
 
+def merge_fill(draft: PlanDraft, fill: SlotFill) -> PlanDraft:
+    """読み取れた値を未入力の項目にだけ写す。
+
+    Args:
+        draft: 現在のイベント内容。
+        fill: 返答から読み取れたもの。
+
+    Returns:
+        更新後のイベント内容。
+    """
+    updated = draft.model_copy(deep=True)
+    for code in SLOT_ORDER:
+        value = getattr(fill, code)
+        if value in (None, [], "") or has_value(updated, code):  # 既に埋まっている項目は上書きしない
+            continue
+        setattr(updated, code, value)
+    return updated
+
+
+def settle_reply(draft: PlanDraft, fill: SlotFill, asked: SlotCode, reply: str) -> PlanDraft:
+    """1問ぶんの読み取り結果を反映する。LLM を呼ばない純粋部分。
+
+    Args:
+        draft: 現在のイベント内容。
+        fill: 返答から読み取れたもの。
+        asked: 直前に聞いたスロット。
+        reply: 顧客の返答。ログにだけ使う。
+
+    Returns:
+        更新後のイベント内容。
+    """
+    updated = merge_fill(draft, fill)
+    skipped = set(updated.skipped)
+    retried = set(updated.retried)
+
+    # 明示的に「無い」「決まっていない」と答えた項目は聞き終わりにする。値が入った項目は対象外
+    skipped |= {code for code in fill.unavailable if not has_value(updated, code)}
+
+    # 返答は直前に聞いた項目についてのものなので, 明示された分以外を勝手に打ち切らない
+    if not has_value(updated, asked) and asked not in skipped:
+        if asked in RETRY_SLOTS and asked not in retried:
+            logger.info("聞き直す slot={} vague={} reply={}", asked, asked in fill.too_vague, reply)
+            retried.add(asked)
+        else:
+            logger.info("読み取れず打ち切り slot={} reply={}", asked, reply)
+            skipped.add(asked)
+    updated.skipped = sorted(skipped)
+    updated.retried = sorted(retried)
+    return updated
+
+
+def settle_form(draft: PlanDraft, fill: SlotFill, written: set[SlotCode]) -> PlanDraft:
+    """フォーム一括の読み取り結果を反映する。LLM を呼ばない純粋部分。
+
+    Args:
+        draft: 現在のイベント内容。
+        fill: 答え全体から読み取れたもの。
+        written: 何か書かれていたスロット。空欄は該当なしとして扱う。
+
+    Returns:
+        更新後のイベント内容。
+    """
+    updated = merge_fill(draft, fill)
+    retried = set(updated.retried)
+
+    # 明示的に「無い」「決まっていない」と答えた項目は聞き直さず打ち切る
+    unavailable = {code for code in fill.unavailable if not has_value(updated, code)}
+    # 粗くて読み取れなかった項目は1回だけ聞き直す。2回目も読み取れなければ打ち切る
+    vague = {
+        code
+        for code in written
+        if code in RETRY_SLOTS and not has_value(updated, code) and code not in retried and code not in unavailable
+    }
+    updated.skipped = sorted({code for code in SLOT_ORDER if not has_value(updated, code)} - vague)
+    updated.retried = sorted(retried | vague)
+    return updated
+
+
 async def apply_reply(draft: PlanDraft, asked: SlotCode, reply: str) -> PlanDraft:
-    """返答を反映する。読み取れなかった項目は聞き終わり扱いにして先へ進む。
+    """返答を反映する。読み取れなかった項目は聞き直すか聞き終わり扱いにして先へ進む。
 
     Args:
         draft: 現在のイベント内容。
@@ -87,26 +165,7 @@ async def apply_reply(draft: PlanDraft, asked: SlotCode, reply: str) -> PlanDraf
         return draft
 
     fill = await _chain.ainvoke({"draft": draft.model_dump_json(), "question": QUESTIONS[asked], "reply": reply})
-    updated = draft.model_copy(deep=True)
-    for code in SLOT_ORDER:
-        value = getattr(fill, code)
-        if value in (None, [], "") or has_value(updated, code):  # 既に埋まっている項目は上書きしない
-            continue
-        setattr(updated, code, value)
-
-    # 返答は直前に聞いた項目についてのものなので, それ以外を勝手に打ち切らない
-    skipped = set(updated.skipped)
-    retried = set(updated.retried)
-    if not has_value(updated, asked):
-        if asked in RETRY_SLOTS and asked not in retried:
-            logger.info("聞き直す slot={} vague={} reply={}", asked, asked in fill.too_vague, reply)
-            retried.add(asked)
-        else:
-            logger.info("読み取れず打ち切り slot={} reply={}", asked, reply)
-            skipped.add(asked)
-    updated.skipped = sorted(skipped)
-    updated.retried = sorted(retried)
-    return updated
+    return settle_reply(draft, fill, asked, reply)
 
 
 async def fill_all(draft: PlanDraft, answers: dict[SlotCode, str]) -> PlanDraft:
@@ -120,23 +179,14 @@ async def fill_all(draft: PlanDraft, answers: dict[SlotCode, str]) -> PlanDraft:
         更新後のイベント内容。
     """
     written = {code: text.strip() for code, text in answers.items() if text.strip()}
-    updated = draft.model_copy(deep=True)
 
+    fill = SlotFill()
     if written:
         # 質問文を添えてどの答えがどの項目のものか分かるようにする。抽出側は複数項目に対応済み
         labelled = "\n".join(f"{QUESTIONS[code]} → {text}" for code, text in written.items())
         fill = await _chain.ainvoke({"draft": draft.model_dump_json(), "question": "(まとめて)", "reply": labelled})
-        for code in SLOT_ORDER:
-            value = getattr(fill, code)
-            if value in (None, [], "") or has_value(updated, code):
-                continue
-            setattr(updated, code, value)
 
-    # 空欄は聞き終わり扱いにする。粗くて読み取れなかった項目は聞き直す余地を残す
-    vague = {code for code in written if not has_value(updated, code) and code in RETRY_SLOTS}
-    updated.skipped = sorted({code for code in SLOT_ORDER if not has_value(updated, code)} - vague)
-    updated.retried = sorted(set(updated.retried))
-    return updated
+    return settle_form(draft, fill, set(written))
 
 
 async def step(draft: PlanDraft, reply: str) -> SparringResponse:
