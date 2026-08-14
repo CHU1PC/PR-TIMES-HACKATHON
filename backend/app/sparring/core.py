@@ -109,6 +109,36 @@ async def apply_reply(draft: PlanDraft, asked: SlotCode, reply: str) -> PlanDraf
     return updated
 
 
+async def fill_all(draft: PlanDraft, answers: dict[SlotCode, str]) -> PlanDraft:
+    """フォームで一度に受けた答えをまとめて反映する。空欄は該当なしとして扱う。
+
+    Args:
+        draft: 現在のイベント内容。
+        answers: スロットごとの自由記述。
+
+    Returns:
+        更新後のイベント内容。
+    """
+    written = {code: text.strip() for code, text in answers.items() if text.strip()}
+    updated = draft.model_copy(deep=True)
+
+    if written:
+        # 質問文を添えてどの答えがどの項目のものか分かるようにする。抽出側は複数項目に対応済み
+        labelled = "\n".join(f"{QUESTIONS[code]} → {text}" for code, text in written.items())
+        fill = await _chain.ainvoke({"draft": draft.model_dump_json(), "question": "(まとめて)", "reply": labelled})
+        for code in SLOT_ORDER:
+            value = getattr(fill, code)
+            if value in (None, [], "") or has_value(updated, code):
+                continue
+            setattr(updated, code, value)
+
+    # 空欄は聞き終わり扱いにする。粗くて読み取れなかった項目は聞き直す余地を残す
+    vague = {code for code in written if not has_value(updated, code) and code in RETRY_SLOTS}
+    updated.skipped = sorted({code for code in SLOT_ORDER if not has_value(updated, code)} - vague)
+    updated.retried = sorted(set(updated.retried))
+    return updated
+
+
 async def step(draft: PlanDraft, reply: str) -> SparringResponse:
     """壁打ちを1往復進める。
 

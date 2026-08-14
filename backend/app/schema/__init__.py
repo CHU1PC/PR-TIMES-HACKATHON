@@ -11,7 +11,14 @@ from app.schema.plan import (
     PlanResult,
     Tone,
 )
-from app.schema.sparring import PlanDraft, SlotCode, SlotState, SparringResponse, SparringTurn
+from app.schema.sparring import (
+    PlanDraft,
+    SlotCode,
+    SlotState,
+    SparringForm,
+    SparringResponse,
+    SparringTurn,
+)
 
 __all__ = [
     "Actor",
@@ -30,6 +37,7 @@ __all__ = [
     "PlanResult",
     "SlotCode",
     "SlotState",
+    "SparringForm",
     "SparringResponse",
     "SparringTurn",
     "Tone",
