@@ -21,6 +21,7 @@ class CalendarEvent(BaseModel):
     end: str = Field(description="終了。終日予定は日付だけになる")
     html_link: str | None = Field(alias="htmlLink", description="Google カレンダーで開く URL")
     status: str | None = Field(description="confirmed / tentative / cancelled")
+    score: float | None = Field(description="似た事例がどれだけ読まれたか。0〜1。数値は画面に出さない")
 
 
 class CalendarStatus(BaseModel):
@@ -37,6 +38,7 @@ class EventCreate(BaseModel):
 
     title: str = Field(min_length=1, max_length=255, description="予定の件名")
     description: str = Field(default="", description="予定の詳細。無ければ空文字")
+    location: str = Field(default="", max_length=255, description="場所。市区町村まで入ると地元紙が拾う")
     all_day: bool = Field(default=False, alias="allDay", description="終日の予定か")
     starts_at: str = Field(alias="startsAt", description="開始 (RFC3339)")
     ends_at: str = Field(alias="endsAt", description="終了 (RFC3339)")

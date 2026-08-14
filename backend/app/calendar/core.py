@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from app.auth.google import load_credentials
+from app.calendar.scoring import refresh_scores, sync_google
 from app.db.models import Event
 from app.schema.calendar import CalendarEvent, EventCreate
 
@@ -63,6 +64,7 @@ def _stored(row: Event) -> CalendarEvent:
         end=ends_at,
         html_link=None,
         status="confirmed",
+        score=row.score,
     )
 
 
@@ -81,7 +83,7 @@ async def create_event(db: AsyncSession, user_id: UUID, payload: EventCreate) ->
         user_id=user_id,
         title=payload.title,
         description=payload.description,
-        location="",
+        location=payload.location,
         starts_at=datetime.fromisoformat(payload.starts_at),
         ends_at=datetime.fromisoformat(payload.ends_at),
         all_day=payload.all_day,
@@ -90,17 +92,18 @@ async def create_event(db: AsyncSession, user_id: UUID, payload: EventCreate) ->
     db.add(row)
     await db.commit()
     await db.refresh(row)
+    await refresh_scores(db, [row])
 
     return _stored(row)
 
 
-async def stored_events(
+async def stored_rows(
     db: AsyncSession,
     user_id: UUID,
     time_min: str | None = None,
     time_max: str | None = None,
-) -> list[CalendarEvent]:
-    """このアプリに登録された予定を引く。
+) -> list[Event]:
+    """このアプリが持つ予定の行を引く。Google から写したぶんも含む。
 
     Args:
         db: データベースセッション。
@@ -109,7 +112,7 @@ async def stored_events(
         time_max: 取得終了時刻 (RFC3339)。None なら絞らない。
 
     Returns:
-        期間に入る予定の一覧。
+        期間に入る予定の行。
     """
     query = select(Event).where(col(Event.user_id) == user_id)
 
@@ -120,9 +123,7 @@ async def stored_events(
     if time_max:
         query = query.where(col(Event.starts_at) <= datetime.fromisoformat(time_max))
 
-    rows = (await db.execute(query.order_by(col(Event.starts_at)))).scalars().all()
-
-    return [_stored(row) for row in rows]
+    return list((await db.execute(query.order_by(col(Event.starts_at)))).scalars().all())
 
 
 async def events(
@@ -142,31 +143,30 @@ async def events(
     Returns:
         このアプリに登録された予定と, 連携していれば Google の予定を合わせたもの。
     """
-    stored = await stored_events(db, user_id, time_min, time_max)
-
     client = await service(db, user_id)
 
-    # 未連携でも自分で足した予定は返す
-    if client is None:
-        return stored
+    if client is not None:
+        params: dict[str, str | bool | int] = {
+            "calendarId": "primary",
+            "singleEvents": True,
+            "orderBy": "startTime",
+            "maxResults": MAX_EVENTS,
+        }
 
-    params: dict[str, str | bool | int] = {
-        "calendarId": "primary",
-        "singleEvents": True,
-        "orderBy": "startTime",
-        "maxResults": MAX_EVENTS,
-    }
+        if time_min:
+            params["timeMin"] = time_min
 
-    if time_min:
-        params["timeMin"] = time_min
+        if time_max:
+            params["timeMax"] = time_max
 
-    if time_max:
-        params["timeMax"] = time_max
+        found = client.events().list(**params).execute()
+        # 採点は DB の行に持たせるので, Google のぶんも写してから読み直す
+        await sync_google(db, user_id, [event for item in found.get("items", []) if (event := _event(item))], JST)
 
-    found = client.events().list(**params).execute()
-    fetched = [event for item in found.get("items", []) if (event := _event(item))]
+    rows = await stored_rows(db, user_id, time_min, time_max)
+    await refresh_scores(db, rows)
 
-    return sorted(stored + fetched, key=lambda event: event.start)
+    return sorted((_stored(row) for row in rows), key=lambda event: event.start)
 
 
 def _event(item: dict) -> CalendarEvent | None:
@@ -199,4 +199,6 @@ def _event(item: dict) -> CalendarEvent | None:
         end=ends_at,
         html_link=item.get("htmlLink"),
         status=item.get("status"),
+        # 採点は取り込んでから。ここでは埋めない
+        score=None,
     )
