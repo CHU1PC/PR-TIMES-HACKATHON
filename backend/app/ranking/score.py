@@ -12,6 +12,7 @@ from app.db.models import EMBEDDING_DIMENSIONS
 
 if TYPE_CHECKING:
     import numpy as np
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 # 並べるのは pv_score だけ。regional_score は予定の種類にほぼ反応せず(実測 0.37〜0.57 に張り付き),
 # 反応するのは「他県の県名を書いたか」だった。U1 は同じ予定に地名を足す**中**の比較で,
@@ -62,6 +63,7 @@ async def plan_score(
     business_category_id: int | None = None,
     prefecture_id: int | None = None,
     top_k: int = NEIGHBORS,
+    db: AsyncSession | None = None,
 ) -> float | None:
     """予定に近い事例が実際どれだけ読まれたかを1つの数にする。
 
@@ -70,6 +72,7 @@ async def plan_score(
         business_category_id: 顧客の業種。None なら加点しない。
         prefecture_id: 顧客の都道府県。None なら加点しない。
         top_k: 見る近傍の数。
+        db: 使い回すセッション。None なら自前で開く。呼び出し元が接続を握っているときは渡す。
 
     Returns:
         0〜1 のスコア。近傍が引けなければ None。
@@ -82,8 +85,12 @@ async def plan_score(
         "prefecture_bonus": SAME_PREFECTURE_BONUS,
         "top_k": top_k,
     }
-    async with session() as db:
+    if db is not None:
         rows = (await db.execute(NEIGHBOR_SQL, params)).scalars().all()
+    else:
+        # 2本目の接続を待って詰まらないよう, 呼び出し元がセッションを持たないときだけ開く
+        async with session() as opened:
+            rows = (await opened.execute(NEIGHBOR_SQL, params)).scalars().all()
     if not rows:
         return None
 

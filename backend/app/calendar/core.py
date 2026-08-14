@@ -3,12 +3,13 @@ from typing import Final
 from uuid import UUID
 
 from googleapiclient.discovery import Resource, build
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from app.auth.google import load_credentials
-from app.calendar.scoring import refresh_scores, sync_google
+from app.calendar.scoring import LOCATION_CHARS, refresh_scores, sync_google
 from app.db.models import Event
 from app.schema import PlanDraft
 from app.schema.calendar import CalendarEvent, EventCreate
@@ -16,9 +17,6 @@ from app.schema.calendar import CalendarEvent, EventCreate
 MAX_EVENTS: Final = 250
 
 NO_TITLE: Final = "(タイトルなし)"
-
-# events.location の桁数に合わせる
-LOCATION_CHARS: Final = 255
 
 # Postgres は timestamptz を UTC で返す。終日の日付を出すときは日本時間に戻してから切る
 JST: Final = timezone(timedelta(hours=9))
@@ -97,7 +95,14 @@ async def create_event(db: AsyncSession, user_id: UUID, payload: EventCreate) ->
     db.add(row)
     await db.commit()
     await db.refresh(row)
-    await refresh_scores(db, [row])
+
+    try:
+        await refresh_scores(db, [row])
+    except Exception as error:  # ruff: ignore[blind-except] — 保存は済んでいる。採点なしで返す
+        logger.warning("採点に失敗 id={}: {}", row.id, error)
+        await db.rollback()
+        # rollback で in-memory 無効 → refresh
+        await db.refresh(row)
 
     return _stored(row)
 
