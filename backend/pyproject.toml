@@ -103,6 +103,9 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # print: 学習・評価はオフラインのバッチで, 結果表を標準出力に出す前提のため logger を通さない.
 # suspicious-pickle-usage: joblib で保存するのは自分で学習した係数のみで, 外部の pickle を読まない.
 "ml/**" = ["print", "suspicious-pickle-usage"]
+# implicit-namespace-package: uv run が直接読む単体スクリプトなので __init__.py を置かない.
+# print: 書き出し先を1行返すだけの手元用ツールのため logger を通さない.
+"scripts/**" = ["implicit-namespace-package", "print"]
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
