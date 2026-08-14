@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, DateTime, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 # expires_at と Cookie の max-age をこの1つから導く
@@ -179,6 +179,8 @@ class Event(SQLModel, table=True):
     scored_text: str = Field(default="", description="採点に使った本文。変わったときだけ引き直す")
     embedding: Any = Field(default=None, sa_column=Column(Vector(EMBEDDING_DIMENSIONS), nullable=True))
     score: float | None = Field(default=None, description="似た事例がどれだけ届いたか。顧客には数値を出さない")
+    # 壁打ちの答えを画面から切り離して持つ。ページを移っても聞き直さない
+    draft: dict[str, object] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),

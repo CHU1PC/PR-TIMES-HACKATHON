@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schema.sparring import PlanDraft
+
 
 class EventQuery(BaseModel):
     """予定を引く期間。キーは Google Calendar API の名前に合わせる。"""
@@ -22,6 +24,7 @@ class CalendarEvent(BaseModel):
     html_link: str | None = Field(alias="htmlLink", description="Google カレンダーで開く URL")
     status: str | None = Field(description="confirmed / tentative / cancelled")
     score: float | None = Field(description="似た事例がどれだけ読まれたか。0〜1。数値は画面に出さない")
+    draft: PlanDraft | None = Field(description="壁打ちで埋めた内容。一度答えた項目は聞き直さない")
 
 
 class CalendarStatus(BaseModel):
