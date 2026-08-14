@@ -51,25 +51,43 @@ export function DayPage() {
   const [endTime, setEndTime] = useState(DEFAULT_END);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const controllerRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback((): AbortController => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    const result = await calendarEvents(dayRange(day), controller.signal);
-    if (controller.signal.aborted) return;
-    // 未ログインなら一覧は空。追加を押した時点で改めて知らせる
-    setEvents(result.ok ? result.data.events : []);
+    void (async () => {
+      const result = await calendarEvents(dayRange(day), controller.signal);
+      if (controller.signal.aborted) return;
+      if (!result.ok) {
+        if (result.kind === "cancelled") return;
+        // 未ログインとセッション切れだけ一覧を空にする。追加を押した時点で改めて知らせる
+        if (result.kind === "unauthorized") {
+          setEvents([]);
+          setLoadError(false);
+          return;
+        }
+        // 一時的な失敗は直前の一覧を残して知らせる
+        setLoadError(true);
+        return;
+      }
+      setEvents(result.data.events);
+      setLoadError(false);
+    })();
+
+    return controller;
   }, [day]);
 
   useEffect(() => {
-    void load();
+    // その回のコントローラだけを閉じ込め, cleanup では別の呼び出しを止めない
+    const controller = load();
 
     return () => {
-      controllerRef.current?.abort();
+      controller.abort();
     };
   }, [load]);
 
@@ -97,7 +115,7 @@ export function DayPage() {
 
     setTitle("");
     setDescription("");
-    void load();
+    load();
   };
 
   return (
@@ -130,6 +148,15 @@ export function DayPage() {
           </div>
         </div>
 
+        {loadError ? (
+          <div className="state state--error" role="alert">
+            <p className="state__message">予定を読み込めませんでした。再読み込みしてください。</p>
+            <button type="button" className="button" onClick={() => { load(); }}>
+              再試行
+            </button>
+          </div>
+        ) : null}
+
         {events.length > 0 ? (
           <ul className="day-plans">
             {events.map((event) => (
@@ -147,9 +174,10 @@ export function DayPage() {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : null}
+        {events.length === 0 && !loadError ? (
           <p className="entry__description">この日にはまだ予定がありません。下から追加できます。</p>
-        )}
+        ) : null}
       </section>
 
       <form className="entry entry--dashboard" onSubmit={(event) => void handleSubmit(event)}>
