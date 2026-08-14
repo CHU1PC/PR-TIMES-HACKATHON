@@ -10,11 +10,15 @@ from sqlmodel import col
 from app.auth.google import load_credentials
 from app.calendar.scoring import refresh_scores, sync_google
 from app.db.models import Event
+from app.schema import PlanDraft
 from app.schema.calendar import CalendarEvent, EventCreate
 
 MAX_EVENTS: Final = 250
 
 NO_TITLE: Final = "(タイトルなし)"
+
+# events.location の桁数に合わせる
+LOCATION_CHARS: Final = 255
 
 # Postgres は timestamptz を UTC で返す。終日の日付を出すときは日本時間に戻してから切る
 JST: Final = timezone(timedelta(hours=9))
@@ -65,6 +69,7 @@ def _stored(row: Event) -> CalendarEvent:
         html_link=None,
         status="confirmed",
         score=row.score,
+        draft=PlanDraft.model_validate(row.draft) if row.draft else None,
     )
 
 
@@ -92,6 +97,41 @@ async def create_event(db: AsyncSession, user_id: UUID, payload: EventCreate) ->
     db.add(row)
     await db.commit()
     await db.refresh(row)
+    await refresh_scores(db, [row])
+
+    return _stored(row)
+
+
+async def save_draft(db: AsyncSession, user_id: UUID, event_id: str, draft: PlanDraft) -> CalendarEvent | None:
+    """壁打ちで埋めた内容を予定に貼り付ける。次に開いたとき同じことを聞かないため。
+
+    Args:
+        db: データベースセッション。
+        user_id: 予定の持ち主。
+        event_id: 自分で足した予定なら UUID, Google 由来なら向こうの予定ID。
+        draft: 壁打ちで埋めた内容。
+
+    Returns:
+        更新後の予定。持ち主が違うか見つからなければ None。
+    """
+    query = select(Event).where(col(Event.user_id) == user_id)
+    try:
+        query = query.where(col(Event.id) == UUID(event_id))
+    except ValueError:
+        # UUID として読めないものは Google 側の予定ID
+        query = query.where(col(Event.external_id) == event_id)
+
+    row = (await db.execute(query)).scalar_one_or_none()
+    if row is None:
+        return None
+
+    row.draft = draft.model_dump()
+    # 壁打ちで聞いた場所は予定に無いことがある。採点にも効くので写す
+    if draft.place and not row.location:
+        row.location = draft.place[:LOCATION_CHARS]
+
+    db.add(row)
+    await db.commit()
     await refresh_scores(db, [row])
 
     return _stored(row)
@@ -199,6 +239,7 @@ def _event(item: dict) -> CalendarEvent | None:
         end=ends_at,
         html_link=item.get("htmlLink"),
         status=item.get("status"),
-        # 採点は取り込んでから。ここでは埋めない
+        # 採点も壁打ちも取り込んでから。ここでは埋めない
         score=None,
+        draft=None,
     )
