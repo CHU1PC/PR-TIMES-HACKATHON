@@ -2036,8 +2036,6 @@ textarea:focus-visible {
   color: var(--ink-faint);
 }
 
-.proposal__back {
-  margin: 24px 0 0;
 @media (max-width: 1120px) {
   .sparring {
     grid-template-columns: 1fr;
