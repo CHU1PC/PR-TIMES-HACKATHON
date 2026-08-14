@@ -2414,12 +2414,6 @@ textarea:focus-visible {
   background: #00008b;
 }
 
-.state--error {
-  background: rgba(0, 0, 139, 0.05);
-  border-color: rgba(0, 0, 139, 0.24);
-  color: #00008b;
-}
-
 /* Integrated screens and third-party calendar use the same brand color. */
 .app-header__action:hover,
 .entry__submit:hover:not(:disabled) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { calendarEvents, calendarStatus } from "@/api";
+import { calendarEvents, calendarStatus, type ApiFailureKind } from "@/api";
 import { Icon } from "@/components/Icon";
 import { formatDate } from "@/lib/date";
 import { Link } from "@/router";
@@ -88,6 +88,7 @@ export function HomePage() {
   const now = new Date();
   const [visibleMonth, setVisibleMonth] = useState(() => ({ year: now.getFullYear(), month: now.getMonth() }));
   const [events, setEvents] = useState<DayEvent[]>([]);
+  const [loadError, setLoadError] = useState(false);
 
   const controllerRef = useRef<AbortController | null>(null);
 
@@ -101,48 +102,65 @@ export function HomePage() {
   );
   const monthLabel = `${String(visibleMonth.year)}年${String(visibleMonth.month + 1)}月`;
 
-  const load = useCallback(async (year: number, month: number) => {
+  const load = useCallback((year: number, month: number): AbortController => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    const current = await calendarStatus(controller.signal);
-    if (controller.signal.aborted) return;
-    if (!current.ok) {
-      setEvents([]);
-      return;
-    }
+    // セッション切れだけ予定を消す。一時的な失敗は直前の予定を残して知らせる
+    const fail = (kind: ApiFailureKind) => {
+      if (kind === "cancelled") return;
+      if (kind === "unauthorized") {
+        setEvents([]);
+        setLoadError(false);
+        return;
+      }
+      setLoadError(true);
+    };
 
-    // 未ログインは予定を出さない。空のカレンダーだけ残す
-    if (!current.data.signed_in) {
-      setEvents([]);
-      return;
-    }
+    void (async () => {
+      const current = await calendarStatus(controller.signal);
+      if (controller.signal.aborted) return;
+      if (!current.ok) {
+        fail(current.kind);
+        return;
+      }
 
-    // 前後の月にはみ出す日も枠に出るので, 見えている42日ぶんを引く
-    const gridStart = new Date(year, month, 1, 12, 0, 0);
-    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-    const gridEnd = new Date(gridStart);
-    gridEnd.setDate(gridStart.getDate() + 42);
+      // 未ログインは予定を出さない。空のカレンダーだけ残す
+      if (!current.data.signed_in) {
+        setEvents([]);
+        setLoadError(false);
+        return;
+      }
 
-    const result = await calendarEvents(
-      { timeMin: gridStart.toISOString(), timeMax: gridEnd.toISOString() },
-      controller.signal,
-    );
-    if (controller.signal.aborted) return;
-    // 401 はセッション切れ。未連携と同じく予定を出さない
-    if (!result.ok) {
-      setEvents([]);
-      return;
-    }
-    setEvents(result.data.events.map(toDayEvent));
+      // 前後の月にはみ出す日も枠に出るので, 見えている42日ぶんを引く
+      const gridStart = new Date(year, month, 1, 12, 0, 0);
+      gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+      const gridEnd = new Date(gridStart);
+      gridEnd.setDate(gridStart.getDate() + 42);
+
+      const result = await calendarEvents(
+        { timeMin: gridStart.toISOString(), timeMax: gridEnd.toISOString() },
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      if (!result.ok) {
+        fail(result.kind);
+        return;
+      }
+      setEvents(result.data.events.map(toDayEvent));
+      setLoadError(false);
+    })();
+
+    return controller;
   }, []);
 
   useEffect(() => {
-    void load(visibleMonth.year, visibleMonth.month);
+    // その回のコントローラだけを閉じ込め, cleanup では別の呼び出しを止めない
+    const controller = load(visibleMonth.year, visibleMonth.month);
 
     return () => {
-      controllerRef.current?.abort();
+      controller.abort();
     };
   }, [load, visibleMonth.year, visibleMonth.month]);
 
@@ -224,6 +242,15 @@ export function HomePage() {
             月表示
           </div>
         </div>
+
+        {loadError ? (
+          <div className="state state--error" role="alert">
+            <p className="state__message">予定を読み込めませんでした。再読み込みしてください。</p>
+            <button type="button" className="button" onClick={() => { load(visibleMonth.year, visibleMonth.month); }}>
+              再試行
+            </button>
+          </div>
+        ) : null}
 
         <div className="calendar-table-wrap">
           <table className="calendar-table">
