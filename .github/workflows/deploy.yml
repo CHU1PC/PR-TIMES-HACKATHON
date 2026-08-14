@@ -72,9 +72,11 @@ jobs:
       # CLOUDFRONT スコープの WebACL は us-east-1 にしか作れない
       - name: WAF スタックを流す(us-east-1)
         run: |
+          # 既存スタックは Default の変更では動かない。明示的に渡して確実に上げる
           aws cloudformation deploy --region us-east-1 \
             --template-file infra/waf.yaml \
             --stack-name "$WAF_STACK" \
+            --parameter-overrides RequestsPer5Minutes=1000 \
             --no-fail-on-empty-changeset
 
       - name: VPC に紐づく値を引く
