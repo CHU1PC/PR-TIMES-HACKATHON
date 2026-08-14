@@ -23,10 +23,13 @@ Parameters:
 
   AllowedSubject:
     Type: String
-    Default: "repo:CHU1PC/PR-TIMES-HACKATHON:ref:refs/heads/main"
+    Default: "repo:CHU1PC@167416194/PR-TIMES-HACKATHON@1332078474:ref:refs/heads/main"
     Description: >-
       このパターンに合う GitHub のワークフローだけがロールを引ける.
       main 以外のブランチからも fork からも引けない.
+      GitHub は sub にアカウントIDとリポジトリIDを刻む (immutable subject)。
+      名前だけの旧形式は一致しない。現在値は
+      gh api repos/<owner>/<repo>/actions/oidc/customization/sub の sub_claim_prefix で確認する.
 
   CreateProvider:
     Type: String
