@@ -8,15 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.calendar.core import JST
 from app.db.models import Event
 
-# (今日からの日数, 開始時刻, 所要時間, 件名, 詳細)。終日は開始時刻を None にする。
+# (今日からの日数, 開始時刻, 所要時間, 件名, 場所, 詳細)。終日は開始時刻を None にする。
 # 2件を同じ日に置いて, 1日に複数入る見え方も確かめられるようにしてある
-_SEED: Final[list[tuple[int, int | None, int, str, str]]] = [
-    (-4, 14, 2, "地元紙の取材", "工場見学の様子を撮ってもらう。"),
-    (1, 10, 2, "郵便局での取り扱い開始", "9月から窓口に置いてもらう。3店舗から始める。"),
-    (1, 15, 1, "新パッケージの撮影", "リニューアルした3商品を撮る。"),
-    (4, None, 0, "東京のまつりに出店", "終日の出店。新商品を配る。"),
-    (9, 13, 3, "ハッカソン開催", "学生が30人来る。会場は本社の会議室。"),
-    (16, 11, 2, "県のものづくり大賞 表彰式", "昨年の改良品が奨励賞に選ばれた。"),
+_SEED: Final[list[tuple[int, int | None, int, str, str, str]]] = [
+    (-4, 14, 2, "地元紙の取材", "熊本市東区", "工場見学の様子を撮ってもらう。"),
+    (1, 10, 2, "郵便局での取り扱い開始", "熊本市中央区", "9月から窓口に置いてもらう。3店舗から始める。"),
+    (1, 15, 1, "新パッケージの撮影", "", "リニューアルした3商品を撮る。"),
+    (4, None, 0, "東京のまつりに出店", "東京都台東区", "終日の出店。新商品を配る。"),
+    (9, 13, 3, "ハッカソン開催", "熊本市中央区", "学生が30人来る。会場は本社の会議室。"),
+    (16, 11, 2, "県のものづくり大賞 表彰式", "熊本県", "昨年の改良品が奨励賞に選ばれた。"),
 ]
 
 
@@ -32,7 +32,7 @@ def build_seed_events(user_id: UUID) -> list[Event]:
     today = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
     built: list[Event] = []
 
-    for offset, hour, hours, title, description in _SEED:
+    for offset, hour, hours, title, location, description in _SEED:
         day = today + timedelta(days=offset)
 
         if hour is None:
@@ -47,7 +47,7 @@ def build_seed_events(user_id: UUID) -> list[Event]:
                 user_id=user_id,
                 title=title,
                 description=description,
-                location="",
+                location=location,
                 starts_at=starts_at,
                 ends_at=ends_at,
                 all_day=hour is None,
