@@ -33,7 +33,20 @@ class Corpus(SQLModel, table=True):
     published_on: date = Field(description="配信日")
     reach: int = Field(description="転載したユニーク媒体数。顧客には出さない")
     reach_score: float = Field(description="log1p(reach)/log1p(max)。投入時に計算し毎クエリ再計算しない")
+    page_view: int = Field(default=0, description="閲覧数。顧客には出さない。評価に使う生値")
+    regional_reach: int = Field(default=0, description="lift>=5 の媒体の数。地元に届いたか")
+    pv_score: float = Field(default=0.0, description="公開月内のパーセンタイル。生の PV は月で43倍動くので均す")
+    regional_score: float = Field(default=0.0, description="県内のパーセンタイル。県で勝率4%〜83%の差が出るので均す")
     embedding: Any = Field(sa_column=Column(Vector(EMBEDDING_DIMENSIONS), nullable=False))
+
+
+class PrefectureWeight(SQLModel, table=True):
+    """県ごとの地域メディアの厚み。地元を推してよいかの重みになる。"""
+
+    __tablename__ = "prefecture_weight"  # pyright: ignore[reportAssignmentType]
+
+    prefecture_id: int = Field(primary_key=True)
+    regional_weight: float = Field(description="regional_reach の非ゼロ率。奈良0.26 / 東京0.18 / 山口1.00")
 
 
 class CorpusMedia(SQLModel, table=True):
@@ -142,12 +155,15 @@ class UserSession(SQLModel, table=True):
 
 
 class Event(SQLModel, table=True):
-    """このアプリが持つ予定。Google から読むぶんとは別に, 自分で足したものを入れる。"""
+    """このアプリが持つ予定。Google から読んだものも採点のためここに写す。"""
 
     __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("user_id", "external_id", name="uq_events_user_external"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    source: str = Field(default="self", max_length=16, description="self か google")
+    external_id: str | None = Field(default=None, max_length=255, description="Google 側の予定ID。自作なら None")
     title: str = Field(max_length=255, description="予定の件名")
     description: str = Field(default="", description="予定の詳細。無ければ空文字")
     location: str = Field(default="", max_length=255, description="場所。無ければ空文字")
@@ -160,6 +176,9 @@ class Event(SQLModel, table=True):
         description="終了日時",
     )
     all_day: bool = Field(default=False, description="終日の予定か。真なら画面には日付だけ出す")
+    scored_text: str = Field(default="", description="採点に使った本文。変わったときだけ引き直す")
+    embedding: Any = Field(default=None, sa_column=Column(Vector(EMBEDDING_DIMENSIONS), nullable=True))
+    score: float | None = Field(default=None, description="似た事例がどれだけ届いたか。顧客には数値を出さない")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),

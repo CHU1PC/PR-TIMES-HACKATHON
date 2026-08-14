@@ -16,7 +16,14 @@ BASE = DATA_DIR / "corpus_base.parquet"
 CORPUS = DATA_DIR / "corpus.parquet"
 MEDIA = DATA_DIR / "corpus_media.parquet"
 REGIONAL = DATA_DIR / "regional_media.parquet"
+PREF_WEIGHT = DATA_DIR / "prefecture_weight.parquet"
 OUT = DATA_DIR / "raw"
+
+# page_view は etl.extract が抽出済み。主催者 RDS に繋ぎ直さずここから読む
+STAT = OUT / "release_stat.csv.gz"
+
+# lift = その県での出現率 / 全国での出現率。5 で「みんなの経済新聞と地方紙」がちょうど入る
+LIFT_MIN = 5
 
 # 対象は corpus.parquet の 12.9万件だけ。本文全件(15.3G文字)を引かずに済ませるための ID 指定
 CHUNK = 2000
@@ -54,6 +61,34 @@ MEDIA_SQL = """
     JOIN (VALUES {pairs}) AS t(company_id, release_id)
       ON w.company_id = t.company_id AND w.release_id = t.release_id
     WHERE w.new_site_name <> '{self_media}'
+"""
+
+# 地域メディアは媒体名の文字列でなく振る舞いで決める。「さんにちEye 山梨日日新聞」は
+# 名前が地方紙でも lift 2.3 で全国転載側に落ちる
+REGIONAL_REACH_SQL = """
+    WITH pref AS (
+        SELECT company_id, release_id, prefecture_id
+        FROM read_parquet('{base}') WHERE prefecture_id IS NOT NULL
+    ),
+    cm AS (
+        SELECT m.company_id, m.release_id, m.new_site_name, p.prefecture_id
+        FROM read_parquet('{media}') m JOIN pref p USING (company_id, release_id)
+    ),
+    n_pref AS (SELECT prefecture_id, count(*) AS n FROM pref GROUP BY 1),
+    n_all AS (SELECT count(*) AS n FROM pref),
+    hit AS (
+        SELECT prefecture_id, new_site_name, count(*) AS h FROM cm GROUP BY 1, 2
+    ),
+    hit_all AS (SELECT new_site_name, count(*) AS h FROM cm GROUP BY 1),
+    lift AS (
+        SELECT hit.prefecture_id, hit.new_site_name,
+               (hit.h::double / n_pref.n) / (hit_all.h::double / (SELECT n FROM n_all)) AS lift
+        FROM hit JOIN n_pref USING (prefecture_id) JOIN hit_all USING (new_site_name)
+    )
+    SELECT cm.company_id, cm.release_id, count(*) AS regional_reach
+    FROM cm JOIN lift USING (prefecture_id, new_site_name)
+    WHERE lift.lift >= {lift_min}
+    GROUP BY 1, 2
 """
 
 
@@ -155,23 +190,42 @@ def merge() -> None:
     media_glob = OUT / "cmedia_*.csv.gz"
 
     with duckdb.connect() as con:
-        stripped = STRIP_HTML.format(column="coalesce(t.body_raw, '')")
-        con.execute(f"""
-            COPY (
-                SELECT b.*,
-                       coalesce(t.subtitle, '') AS subtitle,
-                       left({stripped}, {BODY_TEXT_CHARS}) AS body_head
-                FROM read_parquet('{BASE}') b
-                LEFT JOIN read_csv_auto('{text_glob}', union_by_name = true) t
-                  USING (company_id, release_id)
-                ORDER BY b.company_id, b.release_id
-            ) TO '{CORPUS}' (FORMAT PARQUET, COMPRESSION ZSTD)
-        """)
+        # regional_reach が媒体を要るので, corpus より先に書き出す
         con.execute(f"""
             COPY (
                 SELECT company_id, release_id, new_site_name
                 FROM read_csv_auto('{media_glob}', union_by_name = true)
             ) TO '{MEDIA}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
+
+        stripped = STRIP_HTML.format(column="coalesce(t.body_raw, '')")
+        regional = REGIONAL_REACH_SQL.format(base=BASE, media=MEDIA, lift_min=LIFT_MIN)
+        # 生値のままでは比べられない。PV は公開月で43倍動き, regional_reach は県で勝率4%〜83%の差が出る。
+        # どちらも同じ土俵(月内・県内)の順位に均す。
+        # percent_rank だけだと同点をタイ群の最下位に潰す。regional_reach は中央値3〜4の整数で同点が多く,
+        # 地元重視の県だけスコアが系統的に低く出る。cume_dist との平均で中間順位に均す
+        con.execute(f"""
+            COPY (
+                SELECT b.*,
+                       coalesce(t.subtitle, '') AS subtitle,
+                       left({stripped}, {BODY_TEXT_CHARS}) AS body_head,
+                       coalesce(s.page_view, 0) AS page_view,
+                       coalesce(r.regional_reach, 0) AS regional_reach,
+                       (percent_rank() OVER month_rank + cume_dist() OVER month_rank) / 2 AS pv_score,
+                       (percent_rank() OVER pref_rank + cume_dist() OVER pref_rank) / 2 AS regional_score
+                FROM read_parquet('{BASE}') b
+                LEFT JOIN read_csv_auto('{text_glob}', union_by_name = true) t
+                  USING (company_id, release_id)
+                LEFT JOIN read_csv_auto('{STAT}') s USING (company_id, release_id)
+                LEFT JOIN ({regional}) r USING (company_id, release_id)
+                WINDOW month_rank AS (
+                    PARTITION BY date_trunc('month', b.created_at) ORDER BY coalesce(s.page_view, 0)
+                ),
+                pref_rank AS (
+                    PARTITION BY b.prefecture_id ORDER BY coalesce(r.regional_reach, 0)
+                )
+                ORDER BY b.company_id, b.release_id
+            ) TO '{CORPUS}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
         # 都道府県ごとに「その地域のリリースを拾っている媒体」を数える。
         # 事例が拾われた媒体をそのまま出すと, 熊本の顧客に埼玉の経済新聞が出てしまう
@@ -187,6 +241,16 @@ def merge() -> None:
                 GROUP BY 1, 2, 3
             ) TO '{REGIONAL}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
+        # 地元紙が PR TIMES を自動転載していない県では地域を推しても届かない。
+        # 非ゼロ率をそのまま重みにすると閾値を決めずに済む(奈良0.26 / 東京0.18 / 福岡0.99)
+        con.execute(f"""
+            COPY (
+                SELECT prefecture_id, avg((regional_reach > 0)::int) AS regional_weight
+                FROM read_parquet('{CORPUS}')
+                WHERE prefecture_id IS NOT NULL
+                GROUP BY 1
+            ) TO '{PREF_WEIGHT}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
 
         filled = con.execute(f"""
             SELECT count(*) FILTER (WHERE body_head <> ''), count(*) FROM read_parquet('{CORPUS}')
@@ -194,9 +258,14 @@ def merge() -> None:
         media = con.execute(f"""
             SELECT count(*), count(DISTINCT new_site_name) FROM read_parquet('{MEDIA}')
         """).fetchone()
+        scored = con.execute(f"""
+            SELECT count(*) FILTER (WHERE page_view > 0), count(*) FILTER (WHERE regional_reach > 0)
+            FROM read_parquet('{CORPUS}')
+        """).fetchone()
 
     logger.info("本文 {:,}/{:,}件に充填 → {}", *filled, CORPUS.name)
     logger.info("媒体 {:,}行 / ユニーク {:,}媒体 → {}", *media, MEDIA.name)
+    logger.info("PV {:,}件 / 地域転載 {:,}件", *scored)
 
 
 async def main() -> None:
