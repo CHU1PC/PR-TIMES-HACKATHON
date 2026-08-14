@@ -4,7 +4,6 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { DayPage } from "@/pages/DayPage";
 import { EntryPage } from "@/pages/EntryPage";
 import { HearingPage } from "@/pages/HearingPage";
-import { ProposalPage } from "@/pages/ProposalPage";
 import { HomePage } from "@/pages/HomePage";
 import { SparringPage } from "@/pages/SparringPage";
 import { Link, useRouteLocation } from "@/router";
@@ -31,7 +30,6 @@ export default function App() {
   else if (path === "/entry") page = <EntryPage key={search} />;
   else if (path === "/sparring") page = <SparringPage />;
   else if (path === "/hearing") page = <HearingPage />;
-  else if (path === "/proposal") page = <ProposalPage />;
 
   return (
     <div className="app">

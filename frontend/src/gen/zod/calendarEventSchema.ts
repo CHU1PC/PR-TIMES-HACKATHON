@@ -3,6 +3,7 @@
 * Do not edit manually.
 */
 
+import { planDraftSchema } from "./planDraftSchema.ts";
 import { z } from "zod/v4";
 
 /**
@@ -10,10 +11,14 @@ import { z } from "zod/v4";
  */
 export const calendarEventSchema = z.object({
     "description": z.string().describe("予定の詳細。無ければ空文字"),
+get "draft"(){
+                return z.union([planDraftSchema, z.null()]).describe("壁打ちで埋めた内容。一度答えた項目は聞き直さない")
+              },
 "end": z.string().describe("終了。終日予定は日付だけになる"),
 "htmlLink": z.union([z.string(), z.null()]).describe("Google カレンダーで開く URL"),
 "id": z.string().describe("Google 側の予定ID"),
 "location": z.string().describe("場所。無ければ空文字"),
+"score": z.union([z.number(), z.null()]).describe("似た事例がどれだけ読まれたか。0〜1。数値は画面に出さない"),
 "start": z.string().describe("開始。終日予定は日付だけになる"),
 "status": z.union([z.string(), z.null()]).describe("confirmed / tentative / cancelled"),
 "title": z.string().describe("予定の件名。無題なら (タイトルなし)")

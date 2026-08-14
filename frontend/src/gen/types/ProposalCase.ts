@@ -6,15 +6,9 @@
 
 /**
  * ProposalCase
- * @description コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。
+ * @description コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。\n\n出すのは取り組みのやり方だけなので, 他社を名指しできる情報は exclude=True で JSON に載せない。\nタイトルと本文は社名を含むことが多く, LLM には渡すが応答には出さない。
 */
 export type ProposalCase = {
-    /**
-     * @description 本文冒頭をHTML除去して1000文字。全文は定型文が大半で取らない
-     * @default ""
-     * @type string | undefined
-    */
-    body_head?: string;
     /**
      * @description 業種名
     */
@@ -23,15 +17,6 @@ export type ProposalCase = {
      * @description 市区町村名
     */
     city?: (string | null);
-    /**
-     * @description PR TIMES 側の企業ID
-     * @type integer
-    */
-    company_id: number;
-    /**
-     * @description 配信企業名
-    */
-    company_name?: (string | null);
     /**
      * @description この事例を拾った媒体のうち特徴的なもの
      * @type array
@@ -47,23 +32,7 @@ export type ProposalCase = {
     */
     published_on: string;
     /**
-     * @description 企業内でのリリースID
-     * @type integer
-    */
-    release_id: number;
-    /**
      * @description リリース種別名
     */
     release_type?: (string | null);
-    /**
-     * @description サブタイトル。lead_paragraph の代替(2026年の充填率74%)
-     * @default ""
-     * @type string | undefined
-    */
-    subtitle?: string;
-    /**
-     * @description リリースのタイトル
-     * @type string
-    */
-    title: string;
 };

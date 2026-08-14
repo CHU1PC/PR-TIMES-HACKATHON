@@ -1002,6 +1002,40 @@ textarea:focus-visible {
   -webkit-line-clamp: 2;
 }
 
+.ranking-item__meta {
+  align-items: center;
+  color: var(--ink-soft);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  gap: 8px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.ranking-item__signal {
+  background: var(--accent-soft);
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 800;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.ranking-item__place {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-item__place svg {
+  flex-shrink: 0;
+}
+
 .ranking-list__empty {
   color: var(--ink-soft);
   font-size: 12px;
@@ -1843,6 +1877,24 @@ textarea:focus-visible {
 
 .ready__note {
   margin: 16px 0 0;
+}
+
+/* 6項目を一度に埋めるフォーム。チェックリストの見た目をそのまま使う */
+
+.slot-fields {
+  margin: 4px 0 18px;
+}
+
+.slot-fields .slot {
+  padding: 14px 16px;
+}
+
+.slot__input {
+  margin-top: 10px;
+}
+
+.proposal-panel .state {
+  margin: 0 0 12px;
 }
 
 /* /hearing */

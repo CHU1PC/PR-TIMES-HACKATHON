@@ -23,7 +23,10 @@ export type { ProposalApiProposalPost200, ProposalApiProposalPost422, ProposalAp
 export type { ProposalCase } from "./ProposalCase.ts";
 export type { ProposalRequest } from "./ProposalRequest.ts";
 export type { ProposalResponse } from "./ProposalResponse.ts";
+export type { PutDraftApiCalendarPlansEventIdDraftPut200, PutDraftApiCalendarPlansEventIdDraftPut422, PutDraftApiCalendarPlansEventIdDraftPutMutation, PutDraftApiCalendarPlansEventIdDraftPutMutationRequest, PutDraftApiCalendarPlansEventIdDraftPutMutationResponse, PutDraftApiCalendarPlansEventIdDraftPutPathParams } from "./PutDraftApiCalendarPlansEventIdDraftPut.ts";
 export type { SlotState, SlotStateCodeEnumKey, SlotStateToneEnumKey } from "./SlotState.ts";
+export type { SparringFillApiSparringFillPost200, SparringFillApiSparringFillPost422, SparringFillApiSparringFillPostMutation, SparringFillApiSparringFillPostMutationRequest, SparringFillApiSparringFillPostMutationResponse } from "./SparringFillApiSparringFillPost.ts";
+export type { SparringForm } from "./SparringForm.ts";
 export type { SparringResponse } from "./SparringResponse.ts";
 export type { SparringStepApiSparringStepPost200, SparringStepApiSparringStepPost422, SparringStepApiSparringStepPostMutation, SparringStepApiSparringStepPostMutationRequest, SparringStepApiSparringStepPostMutationResponse } from "./SparringStepApiSparringStepPost.ts";
 export type { SparringTurn } from "./SparringTurn.ts";

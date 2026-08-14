@@ -27,6 +27,13 @@ export type EventCreate = {
     */
     endsAt: string;
     /**
+     * @description 場所。市区町村まで入ると地元紙が拾う
+     * @maxLength 255
+     * @default ""
+     * @type string | undefined
+    */
+    location?: string;
+    /**
      * @description 開始 (RFC3339)
      * @type string
     */

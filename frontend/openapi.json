@@ -9,6 +9,17 @@
             "title": "Description",
             "type": "string"
           },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanDraft"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "壁打ちで埋めた内容。一度答えた項目は聞き直さない"
+          },
           "end": {
             "description": "終了。終日予定は日付だけになる",
             "title": "End",
@@ -35,6 +46,18 @@
             "description": "場所。無ければ空文字",
             "title": "Location",
             "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "似た事例がどれだけ読まれたか。0〜1。数値は画面に出さない",
+            "title": "Score"
           },
           "start": {
             "description": "開始。終日予定は日付だけになる",
@@ -67,7 +90,9 @@
           "start",
           "end",
           "htmlLink",
-          "status"
+          "status",
+          "score",
+          "draft"
         ],
         "title": "CalendarEvent",
         "type": "object"
@@ -209,6 +234,13 @@
           "endsAt": {
             "description": "終了 (RFC3339)",
             "title": "Endsat",
+            "type": "string"
+          },
+          "location": {
+            "default": "",
+            "description": "場所。市区町村まで入ると地元紙が拾う",
+            "maxLength": 255,
+            "title": "Location",
             "type": "string"
           },
           "startsAt": {
@@ -514,14 +546,8 @@
         "type": "object"
       },
       "ProposalCase": {
-        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。",
+        "description": "コーパスから引いた過去の1件。reach は顧客画面に出さない(requirements §7)。\n\n出すのは取り組みのやり方だけなので, 他社を名指しできる情報は exclude=True で JSON に載せない。\nタイトルと本文は社名を含むことが多く, LLM には渡すが応答には出さない。",
         "properties": {
-          "body_head": {
-            "default": "",
-            "description": "本文冒頭をHTML除去して1000文字。全文は定型文が大半で取らない",
-            "title": "Body Head",
-            "type": "string"
-          },
           "business_category": {
             "anyOf": [
               {
@@ -545,23 +571,6 @@
             ],
             "description": "市区町村名",
             "title": "City"
-          },
-          "company_id": {
-            "description": "PR TIMES 側の企業ID",
-            "title": "Company Id",
-            "type": "integer"
-          },
-          "company_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "配信企業名",
-            "title": "Company Name"
           },
           "media": {
             "description": "この事例を拾った媒体のうち特徴的なもの",
@@ -588,11 +597,6 @@
             "title": "Published On",
             "type": "string"
           },
-          "release_id": {
-            "description": "企業内でのリリースID",
-            "title": "Release Id",
-            "type": "integer"
-          },
           "release_type": {
             "anyOf": [
               {
@@ -604,23 +608,9 @@
             ],
             "description": "リリース種別名",
             "title": "Release Type"
-          },
-          "subtitle": {
-            "default": "",
-            "description": "サブタイトル。lead_paragraph の代替(2026年の充填率74%)",
-            "title": "Subtitle",
-            "type": "string"
-          },
-          "title": {
-            "description": "リリースのタイトル",
-            "title": "Title",
-            "type": "string"
           }
         },
         "required": [
-          "company_id",
-          "release_id",
-          "title",
           "published_on",
           "media"
         ],
@@ -732,6 +722,38 @@
           "tone"
         ],
         "title": "SlotState",
+        "type": "object"
+      },
+      "SparringForm": {
+        "description": "フォームで一度に受け取る答え。空欄の項目は該当なしとして扱う。",
+        "properties": {
+          "answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "スロットごとの自由記述。書かなかった項目は入れなくてよい",
+            "propertyNames": {
+              "enum": [
+                "place",
+                "partner",
+                "people",
+                "novelty",
+                "observation",
+                "video"
+              ]
+            },
+            "title": "Answers",
+            "type": "object"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/PlanDraft",
+            "description": "いま分かっているイベント内容"
+          }
+        },
+        "required": [
+          "draft"
+        ],
+        "title": "SparringForm",
         "type": "object"
       },
       "SparringResponse": {
@@ -1106,6 +1128,59 @@
         ]
       }
     },
+    "/api/calendar/plans/{event_id}/draft": {
+      "put": {
+        "description": "壁打ちで埋めた内容をその予定に残す。\n\nArgs:\n    event_id: 自分で足した予定なら UUID, Google 由来なら向こうの予定ID。\n    draft: 壁打ちで埋めた内容。\n    user: セッションから復元したユーザー。\n    db: データベースセッション。\n\nReturns:\n    更新後の予定。\n\nRaises:\n    HTTPException: 本人の予定に見つからないとき。",
+        "operationId": "put_draft_api_calendar_plans__event_id__draft_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEvent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Draft",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
     "/api/calendar/status": {
       "get": {
         "description": "ログイン済みか, この環境で連携が使えるか, この人が連携済みかを返す。\n\n未ログインでも 401 にせず signed_in=false を返す。ログインボタンを出す判断に使うため。\n\nArgs:\n    request: セッション Cookie を読むために使う。\n    db: データベースセッション。\n\nReturns:\n    ログインと連携の状況。",
@@ -1235,6 +1310,48 @@
         "summary": "Proposal",
         "tags": [
           "proposal"
+        ]
+      }
+    },
+    "/api/sparring/fill": {
+      "post": {
+        "description": "フォームの答えをまとめて反映する。粗くて読み取れなかった項目だけ聞き直す。\n\nArgs:\n    form: いま分かっている内容と, スロットごとの答え。\n\nReturns:\n    更新後の内容と, あれば聞き直す質問。",
+        "operationId": "sparring_fill_api_sparring_fill_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sparring Fill",
+        "tags": [
+          "sparring"
         ]
       }
     },

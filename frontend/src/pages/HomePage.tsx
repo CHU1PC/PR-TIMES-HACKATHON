@@ -12,6 +12,10 @@ interface DayEvent {
   date: string;
   title: string;
   description: string;
+  /** 地域情報があると地元紙が拾う。空文字なら場所なし */
+  location: string;
+  /** 似た事例がどれだけ読まれたか。0〜1。未採点は null。数値は画面に出さない */
+  score: number | null;
 }
 
 interface CalendarDay {
@@ -25,6 +29,9 @@ const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 // 1日に何件も入りうる。セルに出すのはここまでで, 残りは件数だけ添える
 const EVENTS_PER_DAY = 2;
+
+// 数値も順位も出さない代わりに, 上位のこの件数だけ傾向を一言添える
+const HIGHLIGHTED_RANKS = 3;
 
 function toDateKey(date: Date): string {
   const year = String(date.getFullYear());
@@ -45,6 +52,8 @@ function toDayEvent(event: CalendarEvent): DayEvent {
     date: startDateKey(event.start),
     title: event.title,
     description: event.description,
+    location: event.location,
+    score: event.score,
   };
 }
 
@@ -149,7 +158,17 @@ export function HomePage() {
 
   const monthlyRankedEvents = useMemo(() => {
     const monthPrefix = `${String(visibleMonth.year)}-${String(visibleMonth.month + 1).padStart(2, "0")}-`;
-    return events.filter((event) => event.date.startsWith(monthPrefix));
+    // score の降順。未採点は末尾へ回し, 同点どうしは日付順を保つ
+    return events
+      .filter((event) => event.date.startsWith(monthPrefix))
+      .sort((left, right) => {
+        if (left.score !== right.score) {
+          if (left.score === null) return 1;
+          if (right.score === null) return -1;
+          return right.score - left.score;
+        }
+        return left.date.localeCompare(right.date);
+      });
   }, [events, visibleMonth.year, visibleMonth.month]);
 
   const moveMonth = (amount: number) => {
@@ -265,23 +284,37 @@ export function HomePage() {
         </div>
 
         <ol className="ranking-list">
-          {monthlyRankedEvents.map((event, index) => (
-            <li key={event.id} className="ranking-list__row">
-              <Link to={entryPath(event.date, event.title)} className="ranking-item" aria-label={`${event.title}でPRネタを作る`}>
-                <span className={`ranking-item__rank ranking-item__rank--${String(index + 1)}`}>{index + 1}</span>
-                <span className="ranking-item__visual ranking-item__visual--blue">
-                  <Icon name="calendar" size={27} />
-                </span>
-                <div className="ranking-item__content">
-                  <div className="ranking-item__title-line">
-                    <h3>{event.title}</h3>
-                    <span>{formatDate(event.date).replace(/^\d{4}年/, "")}</span>
+          {monthlyRankedEvents.map((event, index) => {
+            const isNoted = index < HIGHLIGHTED_RANKS && event.score !== null;
+            return (
+              <li key={event.id} className="ranking-list__row">
+                <Link to={entryPath(event.date, event.title)} className="ranking-item" aria-label={`${event.title}でPRネタを作る`}>
+                  <span className={`ranking-item__rank ranking-item__rank--${String(index + 1)}`}>{index + 1}</span>
+                  <span className="ranking-item__visual ranking-item__visual--blue">
+                    <Icon name="calendar" size={27} />
+                  </span>
+                  <div className="ranking-item__content">
+                    <div className="ranking-item__title-line">
+                      <h3>{event.title}</h3>
+                      <span>{formatDate(event.date).replace(/^\d{4}年/, "")}</span>
+                    </div>
+                    <p>{event.description}</p>
+                    {isNoted || event.location !== "" ? (
+                      <div className="ranking-item__meta">
+                        {isNoted ? <span className="ranking-item__signal">読まれやすい傾向</span> : null}
+                        {event.location !== "" ? (
+                          <span className="ranking-item__place">
+                            <Icon name="location" size={13} />
+                            {event.location}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
-                  <p>{event.description}</p>
-                </div>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            );
+          })}
           {monthlyRankedEvents.length === 0 ? (
             <li className="ranking-list__empty">この月にはランキング対象の予定がありません。</li>
           ) : null}

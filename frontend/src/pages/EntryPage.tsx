@@ -4,16 +4,19 @@ import { formatDate, isValidDate } from "@/lib/date";
 import { loadHearing, loadSparring } from "@/lib/session";
 import { Link, navigate, useQueryParam } from "@/router";
 
-function sparringPath(title: string, startDate: string | null): string {
+function sparringPath(title: string, startDate: string | null, eventId: string | null): string {
   const params = new URLSearchParams({ title });
   if (startDate) params.set("date", startDate);
+  if (eventId) params.set("eventId", eventId);
   return `/sparring?${params.toString()}`;
 }
 
 export function EntryPage() {
   const dateParam = useQueryParam("date");
   const titleParam = useQueryParam("title");
+  const eventIdParam = useQueryParam("eventId");
   const selectedDate = isValidDate(dateParam) ? dateParam : null;
+  const eventId = eventIdParam && eventIdParam.trim() !== "" ? eventIdParam.trim() : null;
   const [title, setTitle] = useState(() => titleParam?.trim() ?? "");
   const [saved] = useState(() => ({ sparring: loadSparring(), hearing: loadHearing() }));
 
@@ -21,7 +24,7 @@ export function EntryPage() {
     event.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
-    navigate(sparringPath(trimmed, selectedDate));
+    navigate(sparringPath(trimmed, selectedDate, eventId));
   };
 
   const hearingPath = selectedDate ? `/hearing?date=${encodeURIComponent(selectedDate)}` : "/hearing";
@@ -89,7 +92,10 @@ export function EntryPage() {
           <ul className="resume__list">
             {saved.sparring ? (
               <li>
-                <Link to={sparringPath(saved.sparring.title, saved.sparring.draft.start_date)} className="resume__item">
+                <Link
+                  to={sparringPath(saved.sparring.title, saved.sparring.draft.start_date, saved.sparring.eventId)}
+                  className="resume__item"
+                >
                   <span className="resume__item-icon">
                     <Icon name="message" size={19} />
                   </span>

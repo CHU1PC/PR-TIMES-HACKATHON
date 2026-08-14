@@ -3,6 +3,7 @@
 * Do not edit manually.
 */
 
+import type { PlanDraft } from "./PlanDraft.ts";
 
 /**
  * CalendarEvent
@@ -14,6 +15,10 @@ export type CalendarEvent = {
      * @type string
     */
     description: string;
+    /**
+     * @description 壁打ちで埋めた内容。一度答えた項目は聞き直さない
+    */
+    draft: (PlanDraft | null);
     /**
      * @description 終了。終日予定は日付だけになる
      * @type string
@@ -33,6 +38,10 @@ export type CalendarEvent = {
      * @type string
     */
     location: string;
+    /**
+     * @description 似た事例がどれだけ読まれたか。0〜1。数値は画面に出さない
+    */
+    score: (number | null);
     /**
      * @description 開始。終日予定は日付だけになる
      * @type string

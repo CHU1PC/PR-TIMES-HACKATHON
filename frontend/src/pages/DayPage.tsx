@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { calendarEvents, createPlan } from "@/api";
 import { Icon } from "@/components/Icon";
-import { formatDate, isValidDate } from "@/lib/date";
+import { dayRange, formatDate, isValidDate } from "@/lib/date";
 import { Link, navigate, useQueryParam } from "@/router";
 import type { CalendarEvent } from "@/types";
 
@@ -28,19 +28,15 @@ function nextMidnight(day: string): string {
   return new Date(year ?? 0, (month ?? 1) - 1, (date ?? 1) + 1, 0, 0, 0).toISOString();
 }
 
-/** その日1日ぶんの取得範囲 */
-function dayRange(day: string): { timeMin: string; timeMax: string } {
-  return { timeMin: atTime(day, "00:00"), timeMax: atTime(day, "23:59") };
-}
-
 /** 予定の開始を画面に出す。終日は時刻を持たない */
 function startLabel(event: CalendarEvent): string {
   if (event.start.length === 10) return "終日";
   return new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" }).format(new Date(event.start));
 }
 
-function entryPath(day: string, title: string): string {
-  return `/entry?date=${encodeURIComponent(day)}&title=${encodeURIComponent(title)}`;
+/** 予定IDまで渡す。決めた内容をその予定に保存できるのは ID があるときだけ */
+function entryPath(day: string, title: string, eventId: string): string {
+  return `/entry?${new URLSearchParams({ date: day, title, eventId }).toString()}`;
 }
 
 export function DayPage() {
@@ -145,8 +141,8 @@ export function DayPage() {
                     {event.description ? <p className="day-plan__description">{event.description}</p> : null}
                   </div>
                 </div>
-                <Link to={entryPath(day, event.title)} className="button button--primary">
-                  この予定でPRネタを作る
+                <Link to={entryPath(day, event.title, event.id)} className="button button--primary">
+                  イベント内容の詳細を決める
                 </Link>
               </li>
             ))}

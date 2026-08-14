@@ -12,13 +12,13 @@ export const chatMessageSchema = z.object({
 export const sparringSessionSchema = z.object({
   /** 入口で入力された予定。復元先を取り違えないための鍵にもする */
   title: z.string(),
+  /** 予定に紐づくならその ID。手入力の予定は null で, サーバーに保存できない */
+  eventId: z.string().nullable(),
   /** サーバーに送り返す現在のイベント内容 */
   draft: planDraftSchema,
-  /** 画面に出す会話の記録。サーバーは保持しない */
-  messages: z.array(chatMessageSchema),
-  /** チェックリスト */
+  /** 6項目の状態。質問文と効果もここに入る */
   slots: z.array(slotStateSchema),
-  /** いま出ている質問 */
+  /** 粗くて読み取れなかった項目の聞き直し */
   question: z.string().nullable(),
   /** いま出ている例示 */
   hint: z.string().nullable(),
