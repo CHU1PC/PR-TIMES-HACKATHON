@@ -6,6 +6,12 @@ Parameters:
     Type: String
     Default: prtimes-hackathon-2026summer
 
+  AppEnv:
+    Type: String
+    Default: production
+    AllowedValues: [production, demo]
+    Description: demo にすると名前だけのデモログインが開く。審査で触ってもらうための完成形
+
   ShortName:
     Type: String
     Default: prtimes-hack
@@ -431,6 +437,9 @@ Resources:
             - ContainerPort: 8000
               Protocol: tcp
           Environment:
+            # demo でデモログインが開く。既定は production で塞がったまま
+            - Name: APP_ENV
+              Value: !Ref AppEnv
             # 本番は CloudFront が同一オリジンで配るので CORS は通らないが,
             # ALB を直に叩いて切り分けるときに要る
             - Name: ALLOWED_ORIGINS
