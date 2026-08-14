@@ -9,7 +9,7 @@ from loguru import logger
 from pgvector.psycopg import register_vector
 from sqlalchemy import Engine, create_engine, inspect, make_url, text
 
-from app.db.models import Category, Corpus, CorpusMedia, MediaFrequency, MediaTotal, Place
+from app.db.models import Category, Corpus, CorpusMedia, MediaFrequency, MediaTotal, Place, PrefectureWeight
 from app.settings import DATA_DIR, settings
 
 CORPUS = DATA_DIR / "corpus.parquet"
@@ -17,6 +17,7 @@ VECTORS = DATA_DIR / "corpus_vec.npy"
 MEDIA = DATA_DIR / "corpus_media.parquet"
 PLACES = DATA_DIR / "places.parquet"
 CATEGORIES = DATA_DIR / "categories.parquet"
+PREF_WEIGHT = DATA_DIR / "prefecture_weight.parquet"
 
 # スキーマは alembic が持つ。ここは空のテーブルに詰めるだけ
 MIGRATE_HINT = "先に `uv run alembic upgrade head` を実行してください"
@@ -32,19 +33,21 @@ TABLES = (
     MediaTotal.__tablename__,
     Place.__tablename__,
     Category.__tablename__,
+    PrefectureWeight.__tablename__,
 )
 
-# 埋め込みは corpus_vec.npy の行番号で対応するので, 並びは index.py の SELECT と必ず同じにする
+# 埋め込みは corpus_vec.npy の行番号で対応するので, 並びは index.py の SELECT と必ず同じにする。
+# reach は corpus_rows が row[-1] で読むので必ず末尾に置く
 SELECT_CORPUS = f"""
     SELECT company_id, release_id, title, coalesce(subtitle, ''), coalesce(body_head, ''), company_name,
            business_category_id, business_category_name, release_type_name,
            prefecture_id, prefecture_name, city_name,
-           created_at::date, reach
+           created_at::date, page_view, regional_reach, pv_score, regional_score, reach
     FROM read_parquet('{CORPUS}')
     ORDER BY company_id, release_id
 """
 
-# SELECT_CORPUS の14列 + 投入時に足す2列。順序を崩すと COPY がずれる
+# SELECT_CORPUS の18列 + 投入時に足す2列。順序を崩すと COPY がずれる
 CORPUS_COLUMNS = (
     "company_id",
     "release_id",
@@ -59,6 +62,10 @@ CORPUS_COLUMNS = (
     "prefecture_name",
     "city_name",
     "published_on",
+    "page_view",
+    "regional_reach",
+    "pv_score",
+    "regional_score",
     "reach",
     "reach_score",
     "embedding",
@@ -83,6 +90,8 @@ SELECT_PLACES = f"SELECT kind, name, prefecture_id FROM read_parquet('{PLACES}')
 # categories.parquet は cases 列も持つが, テーブル定義に無いので落とす
 SELECT_CATEGORIES = f"SELECT business_category_id, business_category_name FROM read_parquet('{CATEGORIES}')"
 
+SELECT_PREF_WEIGHT = f"SELECT prefecture_id, regional_weight FROM read_parquet('{PREF_WEIGHT}')"
+
 # corpus 以外は埋め込みが要らないので, 同じ手順でまとめて流す
 LOOKUPS = (
     (CorpusMedia.__tablename__, ("company_id", "release_id", "new_site_name"), SELECT_MEDIA),
@@ -90,6 +99,7 @@ LOOKUPS = (
     (MediaTotal.__tablename__, ("case_count",), SELECT_MEDIA_TOTAL),
     (Place.__tablename__, ("kind", "name", "prefecture_id"), SELECT_PLACES),
     (Category.__tablename__, ("business_category_id", "business_category_name"), SELECT_CATEGORIES),
+    (PrefectureWeight.__tablename__, ("prefecture_id", "regional_weight"), SELECT_PREF_WEIGHT),
 )
 
 
